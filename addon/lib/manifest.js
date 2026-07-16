@@ -1,6 +1,3 @@
-const FILE_SERVER_URL = process.env.FILE_SERVER_URL || "http://localhost:3003";
-const FILE_SERVER_API_KEY = process.env.FILE_SERVER_API_KEY || "";
-
 const manifest = {
   id: "org.stremio.localfileserver",
   version: "1.0.0",
@@ -13,8 +10,9 @@ const manifest = {
       type: "movie",
     },
   ],
-  resources: ["catalog", "stream"],
+  resources: ["catalog", "meta", "stream"],
   types: ["movie"],
+  idPrefixes: [""],
 };
 
 module.exports = manifest;
