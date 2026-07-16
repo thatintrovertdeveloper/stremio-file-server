@@ -53,8 +53,20 @@ app.add_middleware(
 )
 
 VIDEO_EXTENSIONS = {
-    ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm",
-    ".m4v", ".mpg", ".mpeg", ".3gp", ".ogv", ".ts", ".m2ts",
+    ".mp4": "video/mp4",
+    ".mkv": "video/x-matroska",
+    ".avi": "video/x-msvideo",
+    ".mov": "video/quicktime",
+    ".wmv": "video/x-ms-wmv",
+    ".flv": "video/x-flv",
+    ".webm": "video/webm",
+    ".m4v": "video/x-m4v",
+    ".mpg": "video/mpeg",
+    ".mpeg": "video/mpeg",
+    ".3gp": "video/3gpp",
+    ".ogv": "video/ogg",
+    ".ts": "video/mp2t",
+    ".m2ts": "video/mp2t",
 }
 
 THUMBNAIL_CACHE_DIR = os.path.join(tempfile.gettempdir(), "file-server-thumbnails")
@@ -309,20 +321,22 @@ async def stream(
         end = file_size - 1
 
     content_length = end - start + 1
+    ext = os.path.splitext(full)[1].lower()
+    content_type = VIDEO_EXTENSIONS.get(ext, "application/octet-stream")
     logger.info(f"Stream: {os.path.basename(full)} {start}-{end}/{file_size}")
 
     headers = {
         "Content-Range": f"bytes {start}-{end}/{file_size}",
         "Accept-Ranges": "bytes",
         "Content-Length": str(content_length),
-        "Content-Type": "application/octet-stream",
+        "Content-Type": content_type,
     }
 
     return StreamingResponse(
         stream_file_range(full, start, end),
         status_code=206,
         headers=headers,
-        media_type="application/octet-stream",
+        media_type=content_type,
     )
 
 
