@@ -282,7 +282,7 @@ async def thumbnail(filename: str, auth: bool = Depends(verify_api_key)):
     return FileResponse(path, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
 
 
-@app.get("/{file_path:path}")
+@app.api_route("/{file_path:path}", methods=["GET", "HEAD"])
 async def stream(
     file_path: str,
     request: Request,
@@ -304,6 +304,17 @@ async def stream(
         raise HTTPException(status_code=400, detail="Cannot stream directory")
 
     file_size = os.path.getsize(full)
+    ext = os.path.splitext(full)[1].lower()
+    content_type = VIDEO_EXTENSIONS.get(ext, "application/octet-stream")
+
+    if request.method == "HEAD":
+        headers = {
+            "Accept-Ranges": "bytes",
+            "Content-Length": str(file_size),
+            "Content-Type": content_type,
+        }
+        return Response(status_code=200, headers=headers, media_type=content_type)
+
     start = 0
     end = file_size - 1
 
@@ -321,8 +332,6 @@ async def stream(
         end = file_size - 1
 
     content_length = end - start + 1
-    ext = os.path.splitext(full)[1].lower()
-    content_type = VIDEO_EXTENSIONS.get(ext, "application/octet-stream")
     logger.info(f"Stream: {os.path.basename(full)} {start}-{end}/{file_size}")
 
     headers = {
