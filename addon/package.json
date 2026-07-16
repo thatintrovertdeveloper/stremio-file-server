@@ -1,0 +1,16 @@
+{
+  "name": "stremio-local-file-server",
+  "version": "1.0.0",
+  "description": "Stremio addon for streaming local media files via HTTP file server",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "stremio-addon-sdk": "^1.6.10"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

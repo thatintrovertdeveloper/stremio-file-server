@@ -1,0 +1,32 @@
+services:
+  file-server:
+    build: ./file-server
+    container_name: file-server
+    ports:
+      - "3003:3003"
+    volumes:
+      - ${MEDIA_DIR:-./media}:/media:ro
+    environment:
+      - SOURCE_DIR=/media
+      - API_KEY=${API_KEY:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3003/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  addon:
+    build: ./addon
+    container_name: stremio-addon
+    ports:
+      - "7001:7001"
+    depends_on:
+      file-server:
+        condition: service_healthy
+    environment:
+      - FILE_SERVER_URL=http://file-server:3003
+      - FILE_SERVER_PUBLIC_URL=${FILE_SERVER_PUBLIC_URL:-http://localhost:3003}
+      - FILE_SERVER_API_KEY=${API_KEY:-}
+      - PORT=7001
+    restart: unless-stopped
