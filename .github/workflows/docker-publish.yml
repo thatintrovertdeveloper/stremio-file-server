@@ -15,19 +15,19 @@ jobs:
       matrix:
         include:
           - context: ./file-server
-            image: stremio-file-server
+            suffix: ""
             runner: ubuntu-latest
             platform: linux/amd64
           - context: ./file-server
-            image: stremio-file-server
+            suffix: ""
             runner: ubuntu-24.04-arm
             platform: linux/arm64
           - context: ./addon
-            image: stremio-file-server-addon
+            suffix: "-addon"
             runner: ubuntu-latest
             platform: linux/amd64
           - context: ./addon
-            image: stremio-file-server-addon
+            suffix: "-addon"
             runner: ubuntu-24.04-arm
             platform: linux/arm64
     permissions:
@@ -47,7 +47,7 @@ jobs:
       - uses: docker/metadata-action@v5
         id: meta
         with:
-          images: ghcr.io/${{ matrix.image }}
+          images: ghcr.io/${{ github.repository }}${{ matrix.suffix }}
           tags: |
             type=sha,prefix=sha-
             type=raw,value=latest,enable={{is_default_branch}}
@@ -59,7 +59,7 @@ jobs:
           context: ${{ matrix.context }}
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,"name=ghcr.io/${{ matrix.image }}",push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,"name=ghcr.io/${{ github.repository }}${{ matrix.suffix }}",push-by-digest=true,name-canonical=true,push=true
 
       - name: Export digest
         run: |
@@ -70,7 +70,7 @@ jobs:
       - name: Upload digest
         uses: actions/upload-artifact@v4
         with:
-          name: digests-${{ matrix.image }}-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}
+          name: digests-${{ matrix.suffix == '' && 'main' || 'addon' }}-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}
           path: ${{ runner.temp }}/digests/*
           if-no-files-found: error
           retention-days: 1
@@ -84,8 +84,10 @@ jobs:
     strategy:
       matrix:
         include:
-          - image: stremio-file-server
-          - image: stremio-file-server-addon
+          - suffix: ""
+            artifact: main
+          - suffix: "-addon"
+            artifact: addon
     steps:
       - uses: docker/login-action@v3
         with:
@@ -98,7 +100,7 @@ jobs:
       - uses: docker/metadata-action@v5
         id: meta
         with:
-          images: ghcr.io/${{ matrix.image }}
+          images: ghcr.io/${{ github.repository }}${{ matrix.suffix }}
           tags: |
             type=sha,prefix=sha-
             type=raw,value=latest,enable={{is_default_branch}}
@@ -108,11 +110,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: ${{ runner.temp }}/digests
-          pattern: digests-${{ matrix.image }}-*
+          pattern: digests-${{ matrix.artifact }}-*
           merge-multiple: true
 
       - name: Create manifest list and push
         working-directory: ${{ runner.temp }}/digests
         run: |
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf 'ghcr.io/${{ matrix.image }}@sha256:%s ' *)
+            $(printf 'ghcr.io/${{ github.repository }}${{ matrix.suffix }}@sha256:%s ' *)
