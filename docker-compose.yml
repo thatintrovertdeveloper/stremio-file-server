@@ -29,5 +29,8 @@ services:
       - FILE_SERVER_URL=${FILE_SERVER_URL:-http://file-server:3003}
       - FILE_SERVER_PUBLIC_URL=${FILE_SERVER_PUBLIC_URL:-http://localhost:3003}
       - FILE_SERVER_API_KEY=${API_KEY:-}
+      - TMDB_API_READ_ACCESS_TOKEN=${TMDB_API_READ_ACCESS_TOKEN:-}
+      - TMDB_CACHE_TTL=${TMDB_CACHE_TTL:-86400}
+      - TMDB_LANGUAGE=${TMDB_LANGUAGE:-en-US}
       - PORT=7001
     restart: unless-stopped

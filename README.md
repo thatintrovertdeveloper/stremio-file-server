@@ -139,3 +139,5 @@ environment:
 - [x] Series type support (folder-based season/episode parsing)
 - [x] Subtitle detection (`.srt`/`.ass` alongside videos)
 - [x] Multi-directory support
+- [x] TMDB metadata support
+- [ ] OpenSubtitles subtitle support

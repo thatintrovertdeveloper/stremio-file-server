@@ -2,6 +2,9 @@ const FILE_SERVER_URL = process.env.FILE_SERVER_URL || "http://localhost:3003";
 const FILE_SERVER_PUBLIC_URL = process.env.FILE_SERVER_PUBLIC_URL || FILE_SERVER_URL;
 const FILE_SERVER_API_KEY = process.env.FILE_SERVER_API_KEY || "";
 
+const tmdb = require("./tmdb");
+const matcher = require("./matcher");
+
 function buildHeaders() {
   const headers = {};
   if (FILE_SERVER_API_KEY) {
@@ -29,6 +32,41 @@ async function fetchFileList() {
   return data.files || [];
 }
 
+const tmdbSearchCache = new Map();
+
+async function searchTMDB(title, year, type) {
+  const cacheKey = `${type}:${title}:${year || ""}`;
+  if (tmdbSearchCache.has(cacheKey)) {
+    return tmdbSearchCache.get(cacheKey);
+  }
+
+  let results = [];
+  if (type === "movie") {
+    results = await tmdb.searchMovie(title, year);
+  } else {
+    results = await tmdb.searchTV(title, year);
+  }
+
+  if (results.length === 0) {
+    tmdbSearchCache.set(cacheKey, null);
+    return null;
+  }
+
+  let bestMatch = null;
+  let bestScore = 0;
+
+  for (const result of results) {
+    const score = matcher.scoreMatch(result, title, year);
+    if (score > bestScore && score >= 70) {
+      bestScore = score;
+      bestMatch = result;
+    }
+  }
+
+  tmdbSearchCache.set(cacheKey, bestMatch);
+  return bestMatch;
+}
+
 module.exports = async function (args) {
   try {
     const files = await fetchFileList();
@@ -44,34 +82,69 @@ module.exports = async function (args) {
         }
       }
 
-      const metas = Array.from(shows.entries()).map(([title, firstEpisode]) => ({
-        id: `__series__${title}`,
-        type: "series",
-        name: title,
-        poster: buildThumbUrl(firstEpisode.flatPath),
-        background: buildThumbUrl(firstEpisode.flatPath),
-        description: `${files.filter((f) => f.title === title).length} episodes`,
-      }));
+      const metas = await Promise.all(
+        Array.from(shows.entries()).map(async ([title, firstEpisode]) => {
+          const parsed = matcher.parseFilename(title, "series");
+          const tmdbData = await searchTMDB(parsed.title, parsed.year, "series");
+
+          const meta = {
+            id: `__series__${title}`,
+            type: "series",
+            name: title,
+            poster: buildThumbUrl(firstEpisode.flatPath),
+            background: buildThumbUrl(firstEpisode.flatPath),
+            description: `${files.filter((f) => f.title === title).length} episodes`,
+          };
+
+          if (tmdbData) {
+            meta.poster = tmdb.getImageUrl(tmdbData.poster_path) || meta.poster;
+            meta.background = tmdb.getImageUrl(tmdbData.backdrop_path, "original") || meta.background;
+            meta.description = tmdbData.overview || meta.description;
+            if (tmdbData.first_air_date) {
+              meta.releaseInfo = tmdbData.first_air_date.slice(0, 4);
+            }
+          }
+
+          return meta;
+        })
+      );
 
       return { metas };
     }
 
-    const metas = files
-      .filter((f) => f.type === "movie")
-      .map((file) => ({
-        id: file.flatPath,
-        type: "movie",
-        name: file.name,
-        poster: buildThumbUrl(file.flatPath),
-        background: buildThumbUrl(file.flatPath),
-        description: [
-          file.folderName,
-          `${(file.size / 1024 / 1024 / 1024).toFixed(2)} GB`,
-          file.isComplete ? "Complete" : "Downloading...",
-        ]
-          .filter(Boolean)
-          .join(" | "),
-      }));
+    const movies = files.filter((f) => f.type === "movie");
+    const metas = await Promise.all(
+      movies.map(async (file) => {
+        const parsed = matcher.parseFilename(file.name, "movie");
+        const tmdbData = await searchTMDB(parsed.title, parsed.year, "movie");
+
+        const meta = {
+          id: file.flatPath,
+          type: "movie",
+          name: file.name,
+          poster: buildThumbUrl(file.flatPath),
+          background: buildThumbUrl(file.flatPath),
+          description: [
+            file.folderName,
+            `${(file.size / 1024 / 1024 / 1024).toFixed(2)} GB`,
+            file.isComplete ? "Complete" : "Downloading...",
+          ]
+            .filter(Boolean)
+            .join(" | "),
+        };
+
+        if (tmdbData) {
+          meta.poster = tmdb.getImageUrl(tmdbData.poster_path) || meta.poster;
+          meta.background = tmdb.getImageUrl(tmdbData.backdrop_path, "original") || meta.background;
+          meta.description = tmdbData.overview || meta.description;
+          if (tmdbData.release_date) {
+            meta.releaseInfo = tmdbData.release_date.slice(0, 4);
+          }
+        }
+
+        return meta;
+      })
+    );
 
     return { metas };
   } catch (err) {
