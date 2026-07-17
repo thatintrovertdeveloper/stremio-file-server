@@ -32,6 +32,45 @@ async function fetchFileList() {
 module.exports = async function (args) {
   try {
     const files = await fetchFileList();
+
+    if (args.type === "series" && args.id.startsWith("__series__")) {
+      const showTitle = args.id.replace("__series__", "");
+      const episodes = files.filter(
+        (f) => f.type === "series" && f.title === showTitle
+      );
+
+      if (episodes.length === 0) {
+        return { meta: null };
+      }
+
+      const firstEp = episodes.sort((a, b) => {
+        if (a.season !== b.season) return a.season - b.season;
+        return a.episode - b.episode;
+      })[0];
+
+      return {
+        meta: {
+          id: args.id,
+          type: "series",
+          name: showTitle,
+          poster: buildThumbUrl(firstEp.flatPath),
+          background: buildThumbUrl(firstEp.flatPath),
+          description: `${episodes.length} episodes`,
+          videos: episodes
+            .sort((a, b) => {
+              if (a.season !== b.season) return a.season - b.season;
+              return a.episode - b.episode;
+            })
+            .map((ep) => ({
+              id: ep.flatPath,
+              title: `S${String(ep.season).padStart(2, "0")}E${String(ep.episode).padStart(2, "0")} - ${ep.name}`,
+              season: ep.season,
+              episode: ep.episode,
+            })),
+        },
+      };
+    }
+
     const match = files.find((f) => f.flatPath === args.id);
 
     if (!match) {
@@ -52,14 +91,6 @@ module.exports = async function (args) {
         ]
           .filter(Boolean)
           .join(" | "),
-        videos: [
-          {
-            id: match.flatPath,
-            title: match.name,
-            season: 1,
-            episode: 1,
-          },
-        ],
       },
     };
   } catch (err) {

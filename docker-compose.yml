@@ -8,6 +8,7 @@ services:
       - ${MEDIA_DIR:-./media}:/media:ro
     environment:
       - SOURCE_DIR=/media
+      - SOURCE_DIRS=${SOURCE_DIRS:-}
       - API_KEY=${API_KEY:-}
     restart: unless-stopped
     healthcheck:
@@ -25,7 +26,7 @@ services:
       file-server:
         condition: service_healthy
     environment:
-      - FILE_SERVER_URL=http://file-server:3003
+      - FILE_SERVER_URL=${FILE_SERVER_URL:-http://file-server:3003}
       - FILE_SERVER_PUBLIC_URL=${FILE_SERVER_PUBLIC_URL:-http://localhost:3003}
       - FILE_SERVER_API_KEY=${API_KEY:-}
       - PORT=7001

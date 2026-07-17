@@ -9,9 +9,14 @@ const manifest = {
       name: "Local Files",
       type: "movie",
     },
+    {
+      id: "local",
+      name: "Local Series",
+      type: "series",
+    },
   ],
   resources: ["catalog", "meta", "stream"],
-  types: ["movie"],
+  types: ["movie", "series"],
   idPrefixes: [""],
 };
 

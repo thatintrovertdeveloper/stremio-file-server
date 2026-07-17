@@ -32,21 +32,46 @@ async function fetchFileList() {
 module.exports = async function (args) {
   try {
     const files = await fetchFileList();
+    const type = args.type || "movie";
 
-    const metas = files.map((file) => ({
-      id: file.flatPath,
-      type: "movie",
-      name: file.name,
-      poster: buildThumbUrl(file.flatPath),
-      background: buildThumbUrl(file.flatPath),
-      description: [
-        file.folderName,
-        `${(file.size / 1024 / 1024 / 1024).toFixed(2)} GB`,
-        file.isComplete ? "Complete" : "Downloading...",
-      ]
-        .filter(Boolean)
-        .join(" | "),
-    }));
+    if (type === "series") {
+      const seriesFiles = files.filter((f) => f.type === "series" && f.title);
+      const shows = new Map();
+
+      for (const file of seriesFiles) {
+        if (!shows.has(file.title)) {
+          shows.set(file.title, file);
+        }
+      }
+
+      const metas = Array.from(shows.entries()).map(([title, firstEpisode]) => ({
+        id: `__series__${title}`,
+        type: "series",
+        name: title,
+        poster: buildThumbUrl(firstEpisode.flatPath),
+        background: buildThumbUrl(firstEpisode.flatPath),
+        description: `${files.filter((f) => f.title === title).length} episodes`,
+      }));
+
+      return { metas };
+    }
+
+    const metas = files
+      .filter((f) => f.type === "movie")
+      .map((file) => ({
+        id: file.flatPath,
+        type: "movie",
+        name: file.name,
+        poster: buildThumbUrl(file.flatPath),
+        background: buildThumbUrl(file.flatPath),
+        description: [
+          file.folderName,
+          `${(file.size / 1024 / 1024 / 1024).toFixed(2)} GB`,
+          file.isComplete ? "Complete" : "Downloading...",
+        ]
+          .filter(Boolean)
+          .join(" | "),
+      }));
 
     return { metas };
   } catch (err) {

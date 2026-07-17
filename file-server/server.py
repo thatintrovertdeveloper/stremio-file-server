@@ -69,8 +69,115 @@ VIDEO_EXTENSIONS = {
     ".m2ts": "video/mp2t",
 }
 
+SUBTITLE_EXTENSIONS = {
+    ".srt": "text/plain",
+    ".ass": "text/x-ssa",
+    ".sub": "text/plain",
+    ".ssa": "text/x-ssa",
+}
+
+LANG_CODE_MAP = {
+    "eng": "English", "en": "English", "english": "English",
+    "es": "Spanish", "spa": "Spanish", "esp": "Spanish", "spanish": "Spanish",
+    "fr": "French", "fre": "French", "fra": "French", "french": "French",
+    "de": "German", "ger": "German", "deu": "German", "german": "German",
+    "it": "Italian", "ita": "Italian", "italian": "Italian",
+    "pt": "Portuguese", "por": "Portuguese", "portuguese": "Portuguese",
+    "ru": "Russian", "rus": "Russian", "russian": "Russian",
+    "ja": "Japanese", "jpn": "Japanese", "japanese": "Japanese",
+    "ko": "Korean", "kor": "Korean", "korean": "Korean",
+    "zh": "Chinese", "chi": "Chinese", "zho": "Chinese", "chinese": "Chinese",
+    "ar": "Arabic", "ara": "Arabic", "arabic": "Arabic",
+    "hi": "Hindi", "hin": "Hindi", "hindi": "Hindi",
+    "nl": "Dutch", "dut": "Dutch", "nld": "Dutch", "dutch": "Dutch",
+    "sv": "Swedish", "swe": "Swedish", "swedish": "Swedish",
+    "no": "Norwegian", "nor": "Norwegian", "norwegian": "Norwegian",
+    "da": "Danish", "dan": "Danish", "danish": "Danish",
+    "fi": "Finnish", "fin": "Finnish", "finnish": "Finnish",
+    "pl": "Polish", "pol": "Polish", "polish": "Polish",
+    "tr": "Turkish", "tur": "Turkish", "turkish": "Turkish",
+    "he": "Hebrew", "heb": "Hebrew", "hebrew": "Hebrew",
+    "th": "Thai", "tha": "Thai", "thai": "Thai",
+}
+
+def detect_subtitle_lang(filename: str) -> str:
+    name_no_ext = os.path.splitext(filename)[0].lower()
+    parts = re.split(r'[\s._-]+', name_no_ext)
+    for part in reversed(parts):
+        mapped = LANG_CODE_MAP.get(part)
+        if mapped:
+            return mapped
+    for part in reversed(parts):
+        if len(part) >= 2:
+            mapped = LANG_CODE_MAP.get(part)
+            if mapped:
+                return mapped
+    clean = re.sub(r'[\s._-]+', ' ', name_no_ext).strip()
+    return clean.title() if clean else "Unknown"
+
 THUMBNAIL_CACHE_DIR = os.path.join(tempfile.gettempdir(), "file-server-thumbnails")
 THUMBNAIL_WIDTH = 320
+
+SE_PATTERNS = [
+    re.compile(r'[Ss](\d{1,2})[Ee](\d{1,2})'),
+    re.compile(r'[Ss]eason\s*(\d{1,2})\s*[Ee]pisode\s*(\d{1,2})', re.I),
+    re.compile(r'(\d{1,2})x(\d{1,2})'),
+    re.compile(r'[Ee]p?(?:isode)?\s*(\d{1,2})', re.I),
+]
+
+SEASON_FOLDER_PATTERNS = [
+    re.compile(r'(?:season|temporada|saison|staffel|stagione)\s*(\d{1,2})', re.I),
+    re.compile(r'^[Ss](\d{1,2})$'),
+    re.compile(r'^(\d{1,2})$'),
+]
+
+def detect_content_type(rel: str, name: str) -> Dict[str, Any]:
+    name_no_ext = os.path.splitext(name)[0]
+    parts = rel.split('/')
+    n = len(parts)
+
+    se_match = None
+    for pattern in SE_PATTERNS[:-1]:
+        m = pattern.search(name_no_ext)
+        if m:
+            se_match = m
+            break
+
+    if se_match:
+        season = int(se_match.group(1))
+        episode = int(se_match.group(2))
+
+        if n == 1:
+            title = "Unknown Series"
+        else:
+            title = parts[0]
+
+        return {"type": "series", "title": title, "season": season, "episode": episode}
+
+    if n >= 3:
+        show = parts[0]
+        for part in parts[1:-1]:
+            for sf_pattern in SEASON_FOLDER_PATTERNS:
+                m = sf_pattern.search(part)
+                if m:
+                    season = int(m.group(1))
+
+                    ep_match = None
+                    for ep_pattern in SE_PATTERNS[:-1]:
+                        m2 = ep_pattern.search(name_no_ext)
+                        if m2:
+                            ep_match = m2
+                            break
+
+                    if ep_match:
+                        episode = int(ep_match.group(2))
+                    else:
+                        ep_only = SE_PATTERNS[-1].search(name_no_ext)
+                        episode = int(ep_only.group(1)) if ep_only else 1
+
+                    return {"type": "series", "title": show, "season": season, "episode": episode}
+
+    return {"type": "movie", "title": None, "season": None, "episode": None}
 
 
 class Config:
@@ -81,6 +188,13 @@ class Config:
     @property
     def SOURCE_DIR(self) -> str:
         return os.environ.get("SOURCE_DIR", "/media")
+
+    @property
+    def SOURCE_DIRS(self) -> List[str]:
+        dirs = os.environ.get("SOURCE_DIRS")
+        if dirs:
+            return [d.strip() for d in dirs.split(',') if d.strip()]
+        return [self.SOURCE_DIR]
 
     @property
     def PORT(self) -> int:
@@ -118,48 +232,76 @@ async def verify_api_key(
 # === File Scanner ===
 
 async def scan_files() -> List[Dict[str, Any]]:
-    root = config.SOURCE_DIR
-    if not os.path.isdir(root):
-        logger.warning(f"Source directory not found: {root}")
-        return []
-
+    dirs = config.SOURCE_DIRS
     files = []
     seen = set()
 
-    try:
-        for dirpath, _, filenames in os.walk(root):
-            for fname in filenames:
-                ext = os.path.splitext(fname)[1].lower()
-                if ext not in VIDEO_EXTENSIONS:
-                    continue
+    for root in dirs:
+        if not os.path.isdir(root):
+            logger.warning(f"Source directory not found: {root}")
+            continue
 
-                full = os.path.join(dirpath, fname)
-                rel = os.path.relpath(full, root)
+        try:
+            for dirpath, _, filenames in os.walk(root):
+                sub_files_in_dir = []
+                for fname in filenames:
+                    ext = os.path.splitext(fname)[1].lower()
+                    if ext in SUBTITLE_EXTENSIONS:
+                        sub_files_in_dir.append(fname)
 
-                try:
-                    st = os.stat(full)
-                except OSError:
-                    continue
+                for fname in filenames:
+                    ext = os.path.splitext(fname)[1].lower()
+                    if ext not in VIDEO_EXTENSIONS:
+                        continue
 
-                if fname in seen:
-                    continue
-                seen.add(fname)
+                    full = os.path.join(dirpath, fname)
+                    rel = os.path.relpath(full, root)
+                    rel_normalized = rel.replace("\\", "/")
 
-                is_complete = "incomplete" not in rel.lower()
-                folder = os.path.basename(os.path.dirname(full))
+                    try:
+                        st = os.stat(full)
+                    except OSError:
+                        continue
 
-                files.append({
-                    "name": fname,
-                    "path": rel.replace("\\", "/"),
-                    "flatPath": fname,
-                    "folderName": folder,
-                    "size": st.st_size,
-                    "modified": st.st_mtime,
-                    "isComplete": is_complete,
-                })
+                    dedup_key = f"{root}:{rel_normalized}"
+                    if dedup_key in seen:
+                        continue
+                    seen.add(dedup_key)
 
-    except Exception as e:
-        logger.error(f"Scan error: {e}")
+                    is_complete = "incomplete" not in rel.lower()
+                    folder = os.path.basename(os.path.dirname(full))
+                    content_info = detect_content_type(rel_normalized, fname)
+
+                    video_stem = os.path.splitext(fname)[0].lower()
+                    subtitles = []
+                    for sub_fname in sub_files_in_dir:
+                        sub_stem = os.path.splitext(sub_fname)[0].lower()
+                        if sub_stem == video_stem or sub_stem.startswith(video_stem):
+                            lang = detect_subtitle_lang(sub_fname)
+                            subtitles.append({
+                                "name": sub_fname,
+                                "path": os.path.join(os.path.dirname(rel_normalized), sub_fname).replace("\\", "/").lstrip("./"),
+                                "lang": lang,
+                            })
+
+                    files.append({
+                        "name": fname,
+                        "path": rel_normalized,
+                        "flatPath": fname,
+                        "folderName": folder,
+                        "size": st.st_size,
+                        "modified": st.st_mtime,
+                        "isComplete": is_complete,
+                        "type": content_info["type"],
+                        "title": content_info["title"],
+                        "season": content_info["season"],
+                        "episode": content_info["episode"],
+                        "subtitles": subtitles,
+                        "sourceDir": root,
+                    })
+
+        except Exception as e:
+            logger.error(f"Scan error in {root}: {e}")
 
     files.sort(key=lambda x: (not x["isComplete"], -x["modified"]))
     return files
@@ -189,10 +331,10 @@ async def continuous_scanner():
 # === Thumbnail ===
 
 def find_file_by_name(filename: str) -> Optional[str]:
-    root = config.SOURCE_DIR
-    for dirpath, _, filenames in os.walk(root):
-        if filename in filenames:
-            return os.path.join(dirpath, filename)
+    for root in config.SOURCE_DIRS:
+        for dirpath, _, filenames in os.walk(root):
+            if filename in filenames:
+                return os.path.join(dirpath, filename)
     return None
 
 
@@ -259,7 +401,7 @@ async def health():
     return {
         "status": "healthy",
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "source": config.SOURCE_DIR,
+        "source": config.SOURCE_DIRS,
     }
 
 
@@ -289,10 +431,14 @@ async def stream(
     range: Optional[str] = Header(None),
     auth: bool = Depends(verify_api_key),
 ):
-    root = config.SOURCE_DIR
-    full = os.path.join(root, file_path)
+    full = None
+    for root in config.SOURCE_DIRS:
+        candidate = os.path.join(root, file_path)
+        if os.path.exists(candidate) and not os.path.isdir(candidate):
+            full = candidate
+            break
 
-    if not os.path.exists(full):
+    if not full:
         filename = os.path.basename(file_path)
         found = find_file_by_name(filename)
         if found:
@@ -305,7 +451,7 @@ async def stream(
 
     file_size = os.path.getsize(full)
     ext = os.path.splitext(full)[1].lower()
-    content_type = VIDEO_EXTENSIONS.get(ext, "application/octet-stream")
+    content_type = VIDEO_EXTENSIONS.get(ext) or SUBTITLE_EXTENSIONS.get(ext, "application/octet-stream")
 
     if request.method == "HEAD":
         headers = {
@@ -352,7 +498,7 @@ async def stream(
 @app.on_event("startup")
 async def startup():
     os.makedirs(THUMBNAIL_CACHE_DIR, exist_ok=True)
-    logger.info(f"Source: {config.SOURCE_DIR}")
+    logger.info(f"Source: {config.SOURCE_DIRS}")
     logger.info(f"Auth: {'enabled' if config.API_KEY else 'disabled'}")
 
     files = await scan_files()
