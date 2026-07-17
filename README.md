@@ -65,16 +65,77 @@ API key via:
 
 | Variable | Description | Default |
 |---|---|---|
-| `MEDIA_DIR` | Media directory path | `/path/to/media` |
+| `MEDIA_DIR` | Media directory path (single) | `/path/to/media` |
+| `SOURCE_DIRS` | Multiple directories (comma-separated, overrides `MEDIA_DIR`) | (none) |
 | `API_KEY` | Shared API key | (none) |
 | `PORT` | Addon port | `7001` |
 
 ## Supported Formats
 
-`.mp4` `.mkv` `.avi` `.mov` `.wmv` `.flv` `.webm` `.m4v` `.mpg` `.mpeg` `.3gp` `.ogv` `.ts` `.m2ts`
+**Video:** `.mp4` `.mkv` `.avi` `.mov` `.wmv` `.flv` `.webm` `.m4v` `.mpg` `.mpeg` `.3gp` `.ogv` `.ts` `.m2ts`
+
+**Subtitles:** `.srt` `.ass` `.sub` `.ssa`
+
+## Series Support
+
+Folder-based season/episode parsing. Addon exposes both "movie" and "series" catalogs.
+
+### Folder Structure
+
+```
+Media/
+├── Movies/
+│   └── Inception.mp4          # → movie
+├── Breaking Bad/
+│   ├── Season 1/
+│   │   ├── S01E01 - Pilot.mkv   # → series, S1E1
+│   │   └── S01E01.eng.srt       # → subtitle
+│   └── Season 2/
+│       └── S02E03.mkv           # → series, S2E3
+├── Anime/
+│   └── S01E05.mkv              # → series (SxxExx in filename)
+└── S02E10.mkv                   # → series (root level)
+```
+
+### Detection Rules
+
+- `SxxExx` or `01x01` in filename → series
+- 3+ path levels + season folder (`Season N`, `S01`, `Temporada N`, `Saison N`, `Staffel N`, `Stagione N`) → series
+- Season folder supports English, Spanish, French, German, Italian
+
+### Subtitle Detection
+
+Subtitle files matched to videos by filename stem prefix in same directory:
+
+```
+Movie.mp4          + Movie.eng.srt      → English subtitle
+Movie.mp4          + Movie.spa.srt      → Spanish subtitle
+Movie.mp4          + Movie.srt          → language from filename
+```
+
+Language codes: `.eng` → English, `.es`/`.spa` → Spanish, `.fr` → French, `.de` → German, `.pt` → Portuguese, `.ja` → Japanese, `.ko` → Korean, `.zh` → Chinese, and more.
+
+## Multi-Directory Support
+
+Serve multiple media directories. Set `SOURCE_DIRS` env var:
+
+```bash
+SOURCE_DIRS=/media/tv,/media/movies,/media/anime
+```
+
+Each path must be mounted in `docker-compose.yml`:
+
+```yaml
+volumes:
+  - /host/tv:/media/tv:ro
+  - /host/movies:/media/movies:ro
+  - /host/anime:/media/anime:ro
+environment:
+  - SOURCE_DIRS=/media/tv,/media/movies,/media/anime
+```
 
 ## TODO
 
-- [ ] Series type support (folder-based season/episode parsing)
-- [ ] Subtitle detection (`.srt`/`.ass` alongside videos)
-- [ ] Multi-directory support
+- [x] Series type support (folder-based season/episode parsing)
+- [x] Subtitle detection (`.srt`/`.ass` alongside videos)
+- [x] Multi-directory support
