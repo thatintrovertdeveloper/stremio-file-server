@@ -17,7 +17,7 @@
       "source": "netresearch/git-workflow-skill",
       "sourceType": "github",
       "skillPath": "skills/git-workflow/SKILL.md",
-      "computedHash": "63f46d3dd1f32a544b6cdd57726e439dd3defe3972c32a4c449d3c91cad5eb7a"
+      "computedHash": "3f36edb066f77b5f3b021a04118d50b6c0af1a18c47129a6e2e78e4421013959"
     },
     "interface-kit": {
       "source": "JuliusBrussee/skills",
@@ -36,6 +36,12 @@
       "sourceType": "github",
       "skillPath": "skills/multi-stage-dockerfile/SKILL.md",
       "computedHash": "698bf93a84dae18fd7bd0b1d35c21427307fde78fbdf4624be9726f5f98189ca"
+    },
+    "python-pro": {
+      "source": "jeffallan/claude-skills",
+      "sourceType": "github",
+      "skillPath": "skills/python-pro/SKILL.md",
+      "computedHash": "fae3b07d03d2eb9f9112ceab0ef498ebafab33f1e095dff8c5a36de55ef68445"
     }
   }
 }
