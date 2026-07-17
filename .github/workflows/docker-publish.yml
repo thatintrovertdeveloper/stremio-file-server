@@ -47,7 +47,7 @@ jobs:
       - uses: docker/metadata-action@v5
         id: meta
         with:
-          images: ghcr.io/${{ github.repository }}/${{ matrix.image }}
+          images: ghcr.io/${{ matrix.image }}
           tags: |
             type=sha,prefix=sha-
             type=raw,value=latest,enable={{is_default_branch}}
@@ -59,7 +59,7 @@ jobs:
           context: ${{ matrix.context }}
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,"name=ghcr.io/${{ github.repository }}/${{ matrix.image }}",push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,"name=ghcr.io/${{ matrix.image }}",push-by-digest=true,name-canonical=true,push=true
 
       - name: Export digest
         run: |
@@ -98,7 +98,7 @@ jobs:
       - uses: docker/metadata-action@v5
         id: meta
         with:
-          images: ghcr.io/${{ github.repository }}/${{ matrix.image }}
+          images: ghcr.io/${{ matrix.image }}
           tags: |
             type=sha,prefix=sha-
             type=raw,value=latest,enable={{is_default_branch}}
@@ -115,4 +115,4 @@ jobs:
         working-directory: ${{ runner.temp }}/digests
         run: |
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf 'ghcr.io/${{ github.repository }}/${{ matrix.image }}@sha256:%s ' *)
+            $(printf 'ghcr.io/${{ matrix.image }}@sha256:%s ' *)
