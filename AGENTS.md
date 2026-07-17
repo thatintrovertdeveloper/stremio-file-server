@@ -26,6 +26,10 @@ docker-compose up -d
 - **Stremio SDK handlers return Promises** — Not callbacks. `module.exports = async function(args) { return { streams: [] } }`. Callback pattern silently fails with "handler error".
 - **Media volume is `:ro`** — Read-only mount. No DELETE endpoint exposed.
 - **API key auth** — Three methods: `X-API-Key` header, `Authorization: Bearer`, `?key=` query param. All checked in order.
+- **Stream endpoint supports HEAD** — Required for ffprobe/hls-probe. Returns 200 with Content-Type/Content-Length, no body. Don't remove HEAD method.
+- **Content-Type must match extension** — Browser/player fails with `application/octet-stream`. Use correct MIME from `VIDEO_EXTENSIONS` dict.
+- **CI: native arm64 runners** — QEMU emulation too slow. Workflow uses `ubuntu-24.04-arm` for arm64 builds. Don't switch back to QEMU.
+- **CI: per-arch builds + manifest merge** — Each arch builds separately, pushes by digest, merge job combines into multi-arch manifest. Don't use `platforms: linux/amd64,linux/arm64` in single build step.
 
 ## Verify
 
