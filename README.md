@@ -140,4 +140,4 @@ environment:
 - [x] Subtitle detection (`.srt`/`.ass` alongside videos)
 - [x] Multi-directory support
 - [x] TMDB metadata support
-- [ ] OpenSubtitles subtitle support
+- [x] OpenSubtitles subtitle support

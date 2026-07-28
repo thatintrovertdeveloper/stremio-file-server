@@ -15,7 +15,7 @@ RUN apt-get update && \
 COPY --from=builder /install /usr/local
 
 WORKDIR /app
-COPY server.py .
+COPY server.py subtitle_providers.py subtitle_manager.py .
 
 EXPOSE 3003
 

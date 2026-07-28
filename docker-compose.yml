@@ -10,6 +10,12 @@ services:
       - SOURCE_DIR=/media
       - SOURCE_DIRS=${SOURCE_DIRS:-}
       - API_KEY=${API_KEY:-}
+      - OPENSUBTITLES_API_KEY=${OPENSUBTITLES_API_KEY:-}
+      - OPENSUBTITLES_USERNAME=${OPENSUBTITLES_USERNAME:-}
+      - OPENSUBTITLES_PASSWORD=${OPENSUBTITLES_PASSWORD:-}
+      - SUBTITLE_LANG=${SUBTITLE_LANG:-eng}
+      - SUBTITLE_PROVIDERS=${SUBTITLE_PROVIDERS:-subdl,opensubtitles}
+      - SUBTITLE_CACHE_TTL=${SUBTITLE_CACHE_TTL:-86400}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3003/health')"]

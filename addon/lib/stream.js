@@ -1,6 +1,20 @@
 const FILE_SERVER_URL = process.env.FILE_SERVER_URL || "http://localhost:3003";
 const FILE_SERVER_PUBLIC_URL = process.env.FILE_SERVER_PUBLIC_URL || FILE_SERVER_URL;
 const FILE_SERVER_API_KEY = process.env.FILE_SERVER_API_KEY || "";
+const { fetchExternalSubtitles } = require("./subtitle");
+const { parseFilename } = require("./matcher");
+
+const LANG_NAME_TO_CODE = {
+  english: "eng", spanish: "spa", french: "fre", german: "ger", italian: "ita",
+  portuguese: "por", russian: "rus", japanese: "jpn", korean: "kor", chinese: "chi",
+  arabic: "ara", hindi: "hin", dutch: "dut", swedish: "swe", norwegian: "nor",
+  danish: "dan", finnish: "fin", polish: "pol", turkish: "tur", hebrew: "heb",
+  thai: "tha", vietnamese: "vie",
+};
+
+function langToCode(name) {
+  return LANG_NAME_TO_CODE[name.toLowerCase()] || name;
+}
 
 let cachedFiles = null;
 let cacheTime = 0;
@@ -45,15 +59,24 @@ module.exports = async function (args) {
       return { streams: [] };
     }
 
+    let subs = match.subtitles || [];
+    if (subs.length === 0) {
+      const parsed = parseFilename(match.flatPath, match.type);
+      const external = await fetchExternalSubtitles(
+        parsed.title, parsed.year, match.season, match.episode
+      );
+      subs = external;
+    }
+
     const stream = {
       url: buildStreamUrl(match.path),
       filename: match.flatPath,
       name: "Direct",
       description: `${(match.size / 1024 / 1024 / 1024).toFixed(2)} GB`,
-      subtitles: (match.subtitles || []).map((sub) => ({
-        url: buildStreamUrl(sub.path),
-        lang: sub.lang,
-        name: sub.lang,
+      subtitles: subs.map((sub) => ({
+        url: sub.url,
+        lang: langToCode(sub.lang || sub.name),
+        name: sub.name || sub.lang,
       })),
       behaviorHints: {
         notWebReady: true,

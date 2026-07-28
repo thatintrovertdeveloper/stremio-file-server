@@ -28,6 +28,8 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 import aiofiles
 import uvicorn
+from subtitle_manager import SubtitleManager
+from subtitle_providers import SUBTITLE_CACHE_DIR
 
 logging.basicConfig(
     level=logging.INFO,
@@ -200,8 +202,38 @@ class Config:
     def PORT(self) -> int:
         return int(os.environ.get("PORT", "3003"))
 
+    @property
+    def SUBTITLE_PROVIDERS(self) -> str:
+        return os.environ.get("SUBTITLE_PROVIDERS", "subdl,opensubtitles")
+
+    @property
+    def SUBTITLE_LANG(self) -> str:
+        return os.environ.get("SUBTITLE_LANG", "eng")
+
+    @property
+    def SUBTITLE_CACHE_TTL(self) -> int:
+        return int(os.environ.get("SUBTITLE_CACHE_TTL", "86400"))
+
+    @property
+    def SUBDL_API_KEY(self) -> Optional[str]:
+        return os.environ.get("SUBDL_API_KEY")
+
+    @property
+    def OPENSUBTITLES_API_KEY(self) -> Optional[str]:
+        return os.environ.get("OPENSUBTITLES_API_KEY")
+
+    @property
+    def OPENSUBTITLES_USERNAME(self) -> Optional[str]:
+        return os.environ.get("OPENSUBTITLES_USERNAME")
+
+    @property
+    def OPENSUBTITLES_PASSWORD(self) -> Optional[str]:
+        return os.environ.get("OPENSUBTITLES_PASSWORD")
+
 
 config = Config()
+
+subtitle_manager: Optional[SubtitleManager] = None
 
 FILE_INDEX: Dict[str, Any] = {"files": [], "last_scan": 0, "scanning": False}
 FILE_INDEX_LOCK = asyncio.Lock()
@@ -424,6 +456,34 @@ async def thumbnail(filename: str, auth: bool = Depends(verify_api_key)):
     return FileResponse(path, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
 
 
+@app.get("/api/subtitle/search")
+async def subtitle_search(
+    title: str,
+    lang: str = "eng",
+    year: Optional[str] = None,
+    season: Optional[int] = None,
+    episode: Optional[int] = None,
+    auth: bool = Depends(verify_api_key),
+):
+    if subtitle_manager is None:
+        raise HTTPException(status_code=503, detail="Subtitle manager not initialized")
+    results = await subtitle_manager.search(title, year, season, episode, lang)
+    return JSONResponse(content={"subtitles": [
+        {"name": r.name, "url": f"/{r.path}", "lang": r.lang, "provider": r.provider}
+        for r in results
+    ]})
+
+
+@app.get("/subtitle/file/{file_hash:path}")
+async def subtitle_file(file_hash: str, auth: bool = Depends(verify_api_key)):
+    full = os.path.join(SUBTITLE_CACHE_DIR, file_hash)
+    if not os.path.exists(full) or os.path.isdir(full):
+        raise HTTPException(status_code=404, detail="Subtitle not found")
+    ext = os.path.splitext(full)[1].lower()
+    content_type = SUBTITLE_EXTENSIONS.get(ext, "text/plain")
+    return FileResponse(full, media_type=content_type, headers={"Cache-Control": "public, max-age=86400"})
+
+
 @app.api_route("/{file_path:path}", methods=["GET", "HEAD"])
 async def stream(
     file_path: str,
@@ -500,6 +560,17 @@ async def startup():
     os.makedirs(THUMBNAIL_CACHE_DIR, exist_ok=True)
     logger.info(f"Source: {config.SOURCE_DIRS}")
     logger.info(f"Auth: {'enabled' if config.API_KEY else 'disabled'}")
+
+    global subtitle_manager
+    os.makedirs(SUBTITLE_CACHE_DIR, exist_ok=True)
+    subtitle_manager = SubtitleManager(
+        subdl_api_key=config.SUBDL_API_KEY,
+        os_api_key=config.OPENSUBTITLES_API_KEY,
+        os_username=config.OPENSUBTITLES_USERNAME,
+        os_password=config.OPENSUBTITLES_PASSWORD,
+        cache_ttl=config.SUBTITLE_CACHE_TTL,
+    )
+    logger.info(f"Subtitles: lang={config.SUBTITLE_LANG} providers={config.SUBTITLE_PROVIDERS}")
 
     files = await scan_files()
     async with FILE_INDEX_LOCK:
