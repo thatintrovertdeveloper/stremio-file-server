@@ -2,88 +2,86 @@
 
 ## Architecture
 
-Two independent services communicating over HTTP:
+Two services over HTTP:
 
-- **file-server** (`file-server/server.py`) — Python/FastAPI. Serves video files with range requests, extracts thumbnails via FFmpeg, background file scanner (1s interval). Supports multi-directory via `SOURCE_DIRS` env var.
-- **addon** (`addon/index.js`) — Node.js. Stremio addon SDK. Fetches file list from file server, serves movie + series catalog, meta, and stream handlers to Stremio.
+- **file-server** (`file-server/server.py`) — Python/FastAPI. Serves video with range requests, FFmpeg thumbnails, background scanner (1s interval). Detects movie/series from filename/path. `SOURCE_DIRS` (comma-separated) overrides `SOURCE_DIR`.
+- **addon** (`addon/index.js`) — Node.js 18+. Stremio addon SDK. Fetches file list from file server → catalog/meta/stream handlers. Optional TMDB enrichment.
 
-Stremio connects to addon → addon calls file server API → Stremio streams video directly from file server.
+Stremio → addon → file server API → stream directly from file server.
 
 ## Run
 
 ```bash
-cp .env.example .env  # set MEDIA_DIR and API_KEY
+cp .env.example .env  # set MEDIA_DIR, API_KEY, TMDB_API_READ_ACCESS_TOKEN
 docker-compose up -d
-# Install in Stremio: http://localhost:7001/manifest.json
 ```
 
 ## Verify
 
 ```bash
-# Python syntax (no fastapi install needed on host)
+# Python syntax
 python3 -c "import ast; ast.parse(open('file-server/server.py').read())"
 
-# Node addon loads
+# Node addon loads (no deps needed on host — just syntax check)
 cd addon && node -e "require('./lib/manifest'); console.log('OK')"
 
 # Live health
 curl http://localhost:3003/health
 
-# Movie catalog
+# Catalog/stream (with API key)
 curl -H "X-API-Key: $KEY" http://localhost:7001/catalog/movie/local.json
-
-# Series catalog
-curl -H "X-API-Key: $KEY" http://localhost:7001/catalog/series/local.json
-
-# Stream (with API key)
 curl -H "X-API-Key: $KEY" "http://localhost:7001/stream/movie/FILENAME.json"
 ```
 
+No test framework. No linter config. No typecheck. `node index.js` is the only way to run addon.
+
 ## Gotchas
 
-- **Port 7000 blocked on macOS** — AirPlay占用. Addon listens on 7001. Do not change back to 7000.
-- **ffmpeg must be apt-installed in runtime stage** — Can't copy binary from builder (shared libs missing). `COPY --from=builder /usr/bin/ffmpeg` breaks at runtime.
-- **Health check uses Python urllib** — Slim images have no wget/curl. Don't use wget in healthcheck.
-- **Two FILE_SERVER_URL vars** — `FILE_SERVER_URL` = Docker internal (`http://file-server:3003`). `FILE_SERVER_PUBLIC_URL` = client-facing (`http://localhost:3003`). Poster/stream URLs must use PUBLIC. API calls use internal.
-- **Stremio SDK handlers return Promises** — Not callbacks. `module.exports = async function(args) { return { streams: [] } }`. Callback pattern silently fails with "handler error".
-- **Media volume is `:ro`** — Read-only mount. No DELETE endpoint exposed.
-- **API key auth** — Three methods: `X-API-Key` header, `Authorization: Bearer`, `?key=` query param. All checked in order.
-- **Stream endpoint supports HEAD** — Required for ffprobe/hls-probe. Returns 200 with Content-Type/Content-Length, no body. Don't remove HEAD method.
-- **Content-Type must match extension** — Browser/player fails with `application/octet-stream`. Use correct MIME from `VIDEO_EXTENSIONS` or `SUBTITLE_EXTENSIONS` dict.
-- **CI: native arm64 runners** — QEMU emulation too slow. Workflow uses `ubuntu-24.04-arm` for arm64 builds. Don't switch back to QEMU.
-- **CI: per-arch builds + manifest merge** — Each arch builds separately, pushes by digest, merge job combines into multi-arch manifest. Don't use `platforms: linux/amd64,linux/arm64` in single build step.
-- **Series IDs use `__series__` prefix** — Series show IDs are `__series__{title}`. Stream/meta handlers must match on `flatPath` for episodes, not show ID.
+- **Port 7000 blocked on macOS** — AirPlay hijacks 7000. Addon on 7001. Dockerfile's `EXPOSE 7000` is wrong but harmless (orchestration override). Don't change back.
+- **`flatPath` vs `path`** — file-server returns both. `flatPath` = bare filename (used as meta/stream ID for Stremio). `path` = relative path with dirs (used as stream URL). Stream handler matches on `flatPath`, builds URL from `path`.
+- **Two FILE_SERVER_URL vars** — `FILE_SERVER_URL` = Docker internal (`http://file-server:3003`). `FILE_SERVER_PUBLIC_URL` = client-facing (`http://localhost:3003`). Poster/stream URLs use PUBLIC. API calls use internal.
+- **Stream handler caches file list 5s** — `stream.js` has its own `CACHE_TTL=5000` cache. Not redundant with file server scan — avoids /api/list on every stream request.
+- **Series IDs use `__series__` prefix** — `__series__{title}`. Stream/meta match episodes by `flatPath`, not show ID.
 - **Subtitle matching by stem prefix** — `Movie.mp4` matches `Movie.eng.srt`, `Movie.spa.srt`, `Movie.forced.eng.srt`. Subtitle stem must start with video stem (case-insensitive).
-- **SOURCE_DIRS overrides SOURCE_DIR** — If `SOURCE_DIRS` env var is set (comma-separated), it takes priority over `SOURCE_DIR`.
-- **File dedup by full path** — Dedup key is `{root}:{relpath}`, not basename. Prevents collisions across directories.
+- **File dedup by full path** — Dedup key is `{root}:{relpath}`, not basename. Prevents collisions across multi-dir setups.
+- **API key auth** — Three methods: `X-API-Key` header, `Authorization: Bearer`, `?key=` query param. All checked in order.
+- **Stream endpoint supports HEAD** — Required for ffprobe/hls-probe. Returns 200 with Content-Type/Content-Length, no body. Don't remove HEAD.
+- **Content-Type must match extension** — `application/octet-stream` breaks browser/player. Use correct MIME from `VIDEO_EXTENSIONS`/`SUBTITLE_EXTENSIONS`.
+- **ffmpeg must be apt-installed in runtime stage** — `COPY --from=builder /usr/bin/ffmpeg` breaks (missing shared libs). Install via `apt-get` in final stage.
+- **Health check uses Python urllib** — Slim images lack wget/curl. Don't change healthcheck to use them.
+- **Media volume is `:ro`** — Read-only mount. No DELETE endpoint.
+- **SOURCE_DIRS needs matching volumes** — Each dir in `SOURCE_DIRS` must have a corresponding `volumes:` entry in docker-compose.yml.
+- **CI: native arm64 runners** — QEMU too slow. Workflow uses `ubuntu-24.04-arm` for arm64, `ubuntu-latest` for amd64. Each arch builds + pushes by digest separately, then merge job creates multi-arch manifest.
+- **TMDB is optional** — No token = current behavior (file thumbnails). Token set = enriches posters/descriptions/ratings. Falls back gracefully on search miss or API error. Rate-limited to 40 req/10s, 24h cache.
 
 ## Content Detection
 
-File server classifies each video as `movie` or `series`:
+File server classifies each video:
 
 - `S01E01`, `01x01` in filename → series
 - 3+ path levels + season folder (`Season N`, `S01`, `Temporada N`, `Saison N`, `Staffel N`, `Stagione N`) → series
 - Everything else → movie
-- Season folders support English, Spanish, French, German, Italian names
 
-Each file in `/api/list` includes: `type`, `title` (show name), `season`, `episode`, `subtitles[]`, `sourceDir`.
+`/api/list` response includes: `type`, `title`, `season`, `episode`, `subtitles[]`, `sourceDir`, `flatPath`, `path`.
 
 ## Structure
 
 ```
 file-server/
-  server.py          # FastAPI app, single file (scanner, streaming, thumbnails, subtitle detection)
+  server.py          # FastAPI app (scanner, streaming, thumbnails, subtitle detection)
   requirements.txt   # fastapi, uvicorn, aiofiles, python-multipart
-  Dockerfile         # multi-stage Python 3.11-slim + ffmpeg
+  Dockerfile         # multi-stage python:3.11-slim + ffmpeg
 
 addon/
-  index.js           # entry, wires handlers to SDK
-  lib/manifest.js    # Stremio manifest (movie + series catalogs)
-  lib/catalog.js     # defineCatalogHandler — splits movie/series from /api/list
-  lib/meta.js        # defineMetaHandler — series: episodes array; movie: single meta
-  lib/stream.js      # defineStreamHandler — returns file server URL + subtitles
-  package.json       # stremio-addon-sdk
-  Dockerfile         # multi-stage Node 20-alpine
+  index.js           # entry, wires handlers
+  lib/manifest.js    # Stremio manifest
+  lib/catalog.js     # catalog handler — splits movie/series, TMDB enrichment
+  lib/meta.js        # meta handler — series episodes array, movie single meta, TMDB enrichment
+  lib/stream.js      # stream handler — returns file server URL + subtitles
+  lib/tmdb.js        # TMDB client (cache, rate limit, image URL builder)
+  lib/matcher.js     # filename parser (strip quality/codec → title+year)
+  package.json       # stremio-addon-sdk only
+  Dockerfile         # multi-stage node:20-alpine
 
 docker-compose.yml   # both services, read-only media mount
 ```
