@@ -22,7 +22,8 @@ async function fetchExternalSubtitles(title, year, season, episode) {
       return [];
     }
     const data = await res.json();
-    return (data.subtitles || []).map((sub) => ({
+    return (data.subtitles || []).map((sub, i) => ({
+      id: sub.id || `external-${i}`,
       url: `${FILE_SERVER_PUBLIC_URL}${sub.url}${FILE_SERVER_API_KEY ? `?key=${encodeURIComponent(FILE_SERVER_API_KEY)}` : ""}`,
       lang: SUBTITLE_LANG,
       name: sub.lang,

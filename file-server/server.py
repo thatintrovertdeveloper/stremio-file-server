@@ -474,13 +474,19 @@ async def subtitle_search(
     ]})
 
 
-@app.get("/subtitle/file/{file_hash:path}")
-async def subtitle_file(file_hash: str, auth: bool = Depends(verify_api_key)):
+@app.api_route("/subtitle/file/{file_hash:path}", methods=["GET", "HEAD"])
+async def subtitle_file(file_hash: str, request: Request, auth: bool = Depends(verify_api_key)):
     full = os.path.join(SUBTITLE_CACHE_DIR, file_hash)
     if not os.path.exists(full) or os.path.isdir(full):
         raise HTTPException(status_code=404, detail="Subtitle not found")
     ext = os.path.splitext(full)[1].lower()
     content_type = SUBTITLE_EXTENSIONS.get(ext, "text/plain")
+    if request.method == "HEAD":
+        return Response(
+            status_code=200,
+            headers={"Content-Length": str(os.path.getsize(full)), "Content-Type": content_type},
+            media_type=content_type,
+        )
     return FileResponse(full, media_type=content_type, headers={"Cache-Control": "public, max-age=86400"})
 
 

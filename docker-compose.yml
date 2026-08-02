@@ -6,6 +6,7 @@ services:
       - "3003:3003"
     volumes:
       - ${MEDIA_DIR:-./media}:/media:ro
+      - subtitle-cache:/tmp/file-server-subtitles
     environment:
       - SOURCE_DIR=/media
       - SOURCE_DIRS=${SOURCE_DIRS:-}
@@ -40,3 +41,6 @@ services:
       - TMDB_LANGUAGE=${TMDB_LANGUAGE:-en-US}
       - PORT=7001
     restart: unless-stopped
+
+volumes:
+  subtitle-cache:

@@ -73,7 +73,8 @@ module.exports = async function (args) {
       filename: match.flatPath,
       name: "Direct",
       description: `${(match.size / 1024 / 1024 / 1024).toFixed(2)} GB`,
-      subtitles: subs.map((sub) => ({
+      subtitles: subs.map((sub, i) => ({
+        id: sub.id || `sub-${i}`,
         url: sub.url,
         lang: langToCode(sub.lang || sub.name),
         name: sub.name || sub.lang,
