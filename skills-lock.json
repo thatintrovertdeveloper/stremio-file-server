@@ -7,17 +7,17 @@
       "skillPath": "skills/caveman/SKILL.md",
       "computedHash": "1902fa0b569912d0c05736d8d98a72097d9b82719aac88c0c1d03bb546f9176d"
     },
-    "fuck-slop": {
-      "source": "JuliusBrussee/skills",
+    "code-review": {
+      "source": "mattpocock/skills",
       "sourceType": "github",
-      "skillPath": "skills/fuck-slop/SKILL.md",
-      "computedHash": "17ae400cf721c286c187c6613795091c4fb81aed02ce52cc23e86c2f6b170f4d"
+      "skillPath": "skills/engineering/code-review/SKILL.md",
+      "computedHash": "1d5e7242a98674635be79ab310cdda0e555d36a9903d2526ebf4263d0b7997ca"
     },
     "git-workflow": {
       "source": "netresearch/git-workflow-skill",
       "sourceType": "github",
       "skillPath": "skills/git-workflow/SKILL.md",
-      "computedHash": "3f36edb066f77b5f3b021a04118d50b6c0af1a18c47129a6e2e78e4421013959"
+      "computedHash": "3f6e39f98870477d33e0d71d3429a687b1cf9d6deaec8eb934890463879fe995"
     },
     "interface-kit": {
       "source": "JuliusBrussee/skills",
@@ -42,6 +42,12 @@
       "sourceType": "github",
       "skillPath": "skills/python-pro/SKILL.md",
       "computedHash": "fae3b07d03d2eb9f9112ceab0ef498ebafab33f1e095dff8c5a36de55ef68445"
+    },
+    "wayfinder": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/wayfinder/SKILL.md",
+      "computedHash": "f343ecf46157cb645a5494644418308ad95391e9fc696faa47ae5a412bf5f6e4"
     }
   }
 }
