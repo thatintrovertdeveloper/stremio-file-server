@@ -18,6 +18,7 @@ import logging
 import tempfile
 import subprocess
 import glob
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
@@ -40,16 +41,54 @@ logger = logging.getLogger("file-server")
 
 security = HTTPBearer(auto_error=False)
 
+scanner_task: Optional[asyncio.Task] = None
+
+@asynccontextmanager
+async def lifespan(app):
+    os.makedirs(THUMBNAIL_CACHE_DIR, exist_ok=True)
+    logger.info(f"Source: {config.SOURCE_DIRS}")
+    logger.info(f"Auth: {'enabled' if config.API_KEY else 'disabled'}")
+
+    global subtitle_manager, scanner_task
+    os.makedirs(SUBTITLE_CACHE_DIR, exist_ok=True)
+    subtitle_manager = SubtitleManager(
+        subdl_api_key=config.SUBDL_API_KEY,
+        os_api_key=config.OPENSUBTITLES_API_KEY,
+        os_username=config.OPENSUBTITLES_USERNAME,
+        os_password=config.OPENSUBTITLES_PASSWORD,
+        cache_ttl=config.SUBTITLE_CACHE_TTL,
+    )
+    logger.info(f"Subtitles: lang={config.SUBTITLE_LANG} providers={config.SUBTITLE_PROVIDERS}")
+
+    files = await scan_files()
+    async with FILE_INDEX_LOCK:
+        FILE_INDEX["files"] = files
+        FILE_INDEX["last_scan"] = time.time()
+
+    logger.info(f"Initial scan: {len(files)} videos")
+    scanner_task = asyncio.create_task(continuous_scanner())
+
+    yield
+
+    if scanner_task:
+        scanner_task.cancel()
+        try:
+            await scanner_task
+        except asyncio.CancelledError:
+            pass
+    logger.info("Shutting down")
+
 app = FastAPI(
     title="Local File Server",
     description="HTTP file server for Stremio local media streaming",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -119,6 +158,7 @@ def detect_subtitle_lang(filename: str) -> str:
 
 THUMBNAIL_CACHE_DIR = os.path.join(tempfile.gettempdir(), "file-server-thumbnails")
 THUMBNAIL_WIDTH = 320
+THUMBNAIL_CACHE_MAX_SIZE = 100 * 1024 * 1024  # 100MB max cache size
 
 SE_PATTERNS = [
     re.compile(r'[Ss](\d{1,2})[Ee](\d{1,2})'),
@@ -387,6 +427,37 @@ def extract_thumbnail(file_path: str, dest: str) -> bool:
         return False
 
 
+def evict_thumbnail_cache():
+    """Remove oldest thumbnails when cache exceeds max size."""
+    try:
+        if not os.path.exists(THUMBNAIL_CACHE_DIR):
+            return
+        
+        files = []
+        for f in os.listdir(THUMBNAIL_CACHE_DIR):
+            path = os.path.join(THUMBNAIL_CACHE_DIR, f)
+            if os.path.isfile(path):
+                stat = os.stat(path)
+                files.append((path, stat.st_mtime, stat.st_size))
+        
+        total_size = sum(s for _, _, s in files)
+        if total_size <= THUMBNAIL_CACHE_MAX_SIZE:
+            return
+        
+        files.sort(key=lambda x: x[1])  # Sort by modification time
+        
+        for path, _, size in files:
+            if total_size <= THUMBNAIL_CACHE_MAX_SIZE * 0.8:  # Evict to 80%
+                break
+            try:
+                os.remove(path)
+                total_size -= size
+            except OSError:
+                pass
+    except Exception:
+        pass
+
+
 def get_thumbnail_path(filename: str) -> Optional[str]:
     os.makedirs(THUMBNAIL_CACHE_DIR, exist_ok=True)
     h = hashlib.md5(filename.encode()).hexdigest()[:12]
@@ -394,6 +465,8 @@ def get_thumbnail_path(filename: str) -> Optional[str]:
 
     if os.path.exists(thumb) and os.path.getsize(thumb) > 0:
         return thumb
+
+    evict_thumbnail_cache()
 
     source = find_file_by_name(filename)
     if not source:
@@ -433,7 +506,6 @@ async def health():
     return {
         "status": "healthy",
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "source": config.SOURCE_DIRS,
     }
 
 
@@ -499,7 +571,9 @@ async def stream(
 ):
     full = None
     for root in config.SOURCE_DIRS:
-        candidate = os.path.join(root, file_path)
+        candidate = os.path.normpath(os.path.join(root, file_path))
+        if not candidate.startswith(os.path.normpath(root)):
+            continue
         if os.path.exists(candidate) and not os.path.isdir(candidate):
             full = candidate
             break
@@ -559,37 +633,6 @@ async def stream(
         headers=headers,
         media_type=content_type,
     )
-
-
-@app.on_event("startup")
-async def startup():
-    os.makedirs(THUMBNAIL_CACHE_DIR, exist_ok=True)
-    logger.info(f"Source: {config.SOURCE_DIRS}")
-    logger.info(f"Auth: {'enabled' if config.API_KEY else 'disabled'}")
-
-    global subtitle_manager
-    os.makedirs(SUBTITLE_CACHE_DIR, exist_ok=True)
-    subtitle_manager = SubtitleManager(
-        subdl_api_key=config.SUBDL_API_KEY,
-        os_api_key=config.OPENSUBTITLES_API_KEY,
-        os_username=config.OPENSUBTITLES_USERNAME,
-        os_password=config.OPENSUBTITLES_PASSWORD,
-        cache_ttl=config.SUBTITLE_CACHE_TTL,
-    )
-    logger.info(f"Subtitles: lang={config.SUBTITLE_LANG} providers={config.SUBTITLE_PROVIDERS}")
-
-    files = await scan_files()
-    async with FILE_INDEX_LOCK:
-        FILE_INDEX["files"] = files
-        FILE_INDEX["last_scan"] = time.time()
-
-    logger.info(f"Initial scan: {len(files)} videos")
-    asyncio.create_task(continuous_scanner())
-
-
-@app.on_event("shutdown")
-async def shutdown():
-    logger.info("Shutting down")
 
 
 def main():

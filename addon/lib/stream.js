@@ -1,6 +1,4 @@
-const FILE_SERVER_URL = process.env.FILE_SERVER_URL || "http://localhost:3003";
-const FILE_SERVER_PUBLIC_URL = process.env.FILE_SERVER_PUBLIC_URL || FILE_SERVER_URL;
-const FILE_SERVER_API_KEY = process.env.FILE_SERVER_API_KEY || "";
+const { FILE_SERVER_PUBLIC_URL, FILE_SERVER_API_KEY, fetchFileList } = require("./file-server");
 const { fetchExternalSubtitles } = require("./subtitle");
 const { parseFilename } = require("./matcher");
 
@@ -14,31 +12,6 @@ const LANG_NAME_TO_CODE = {
 
 function langToCode(name) {
   return LANG_NAME_TO_CODE[name.toLowerCase()] || name;
-}
-
-let cachedFiles = null;
-let cacheTime = 0;
-const CACHE_TTL = 5000;
-
-async function fetchFileList() {
-  const now = Date.now();
-  if (cachedFiles && now - cacheTime < CACHE_TTL) {
-    return cachedFiles;
-  }
-
-  const headers = {};
-  if (FILE_SERVER_API_KEY) {
-    headers["X-API-Key"] = FILE_SERVER_API_KEY;
-  }
-
-  const res = await fetch(`${FILE_SERVER_URL}/api/list`, { headers });
-  if (!res.ok) {
-    throw new Error(`File server returned ${res.status}`);
-  }
-  const data = await res.json();
-  cachedFiles = data.files || [];
-  cacheTime = now;
-  return cachedFiles;
 }
 
 function buildStreamUrl(filePath) {
