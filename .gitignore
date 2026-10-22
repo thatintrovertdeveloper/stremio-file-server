@@ -6,3 +6,7 @@ __pycache__/
 .agents/
 media/
 .claude/
+
+# QA artifacts (regenerable)
+.qa/
+qa-results/
