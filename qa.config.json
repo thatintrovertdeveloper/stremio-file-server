@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "goal": "Verify the Stremio critical flows: catalog listing, streaming with range requests, episode mapping and subtitle delivery",
+  "budgetMs": 240000,
+  "checks": [
+    {
+      "id": "critical-flows",
+      "command": ["bash", "scripts/qa-e2e.sh"],
+      "reporter": "tap",
+      "timeoutMs": 180000
+    }
+  ]
+}
