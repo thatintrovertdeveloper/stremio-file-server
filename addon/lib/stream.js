@@ -23,6 +23,15 @@ function buildStreamUrl(filePath) {
   return base;
 }
 
+// Local sidecars arrive from /api/list as { name, path, lang }; external providers
+// arrive from /api/subtitle/search with a ready-made url. Both must end up as a
+// url the Stremio client can fetch — a subtitle without one never loads.
+function subtitleUrl(sub) {
+  if (sub.url) return sub.url;
+  if (!sub.path) return null;
+  return buildStreamUrl(sub.path);
+}
+
 module.exports = async function (args) {
   try {
     const files = await fetchFileList();
@@ -46,12 +55,14 @@ module.exports = async function (args) {
       filename: match.flatPath,
       name: "Direct",
       description: `${(match.size / 1024 / 1024 / 1024).toFixed(2)} GB`,
-      subtitles: subs.map((sub, i) => ({
-        id: sub.id || `sub-${i}`,
-        url: sub.url,
-        lang: langToCode(sub.lang || sub.name),
-        name: sub.name || sub.lang,
-      })),
+      subtitles: subs
+        .map((sub, i) => ({
+          id: sub.id || `sub-${i}`,
+          url: subtitleUrl(sub),
+          lang: langToCode(sub.lang || sub.name),
+          name: sub.name || sub.lang,
+        }))
+        .filter((sub) => sub.url),
       behaviorHints: {
         notWebReady: true,
         filename: match.flatPath,
