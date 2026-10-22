@@ -603,10 +603,12 @@ async def stream(
 
     start = 0
     end = file_size - 1
+    is_range_request = False
 
     if range:
         match = re.search(r"bytes=(\d+)-(\d*)", range)
         if match:
+            is_range_request = True
             start = int(match.group(1))
             if match.group(2):
                 end = int(match.group(2))
@@ -621,15 +623,22 @@ async def stream(
     logger.info(f"Stream: {os.path.basename(full)} {start}-{end}/{file_size}")
 
     headers = {
-        "Content-Range": f"bytes {start}-{end}/{file_size}",
         "Accept-Ranges": "bytes",
         "Content-Length": str(content_length),
         "Content-Type": content_type,
     }
 
+    # RFC 9110: 206 (and Content-Range) only answers a request that asked for a range.
+    # A plain GET gets the whole entity with 200.
+    if is_range_request:
+        headers["Content-Range"] = f"bytes {start}-{end}/{file_size}"
+        status_code = 206
+    else:
+        status_code = 200
+
     return StreamingResponse(
         stream_file_range(full, start, end),
-        status_code=206,
+        status_code=status_code,
         headers=headers,
         media_type=content_type,
     )
