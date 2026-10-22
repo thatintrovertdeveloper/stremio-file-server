@@ -11,13 +11,13 @@
       "source": "mattpocock/skills",
       "sourceType": "github",
       "skillPath": "skills/engineering/code-review/SKILL.md",
-      "computedHash": "1d5e7242a98674635be79ab310cdda0e555d36a9903d2526ebf4263d0b7997ca"
+      "computedHash": "57cfd4ceb011f05e58a1a4f4cad3b2e03419d371f8990f4bcb32ff0d435a039f"
     },
     "git-workflow": {
       "source": "netresearch/git-workflow-skill",
       "sourceType": "github",
       "skillPath": "skills/git-workflow/SKILL.md",
-      "computedHash": "3f6e39f98870477d33e0d71d3429a687b1cf9d6deaec8eb934890463879fe995"
+      "computedHash": "880f699ed9793380b6cd22cafcd1cf43bf29c596870c883e6e2aa3749566f891"
     },
     "interface-kit": {
       "source": "JuliusBrussee/skills",
@@ -29,7 +29,7 @@
       "source": "jeffallan/claude-skills",
       "sourceType": "github",
       "skillPath": "skills/javascript-pro/SKILL.md",
-      "computedHash": "d5d4526309a674a2ddfd99aa9fb31fe061af225a7b3750eed52a2d38c8ce6041"
+      "computedHash": "56a5b700d1a755a90dcb6b5a53b748ed68e5f569238aaa1dd7b354504e54783c"
     },
     "multi-stage-dockerfile": {
       "source": "github/awesome-copilot",
@@ -41,13 +41,43 @@
       "source": "jeffallan/claude-skills",
       "sourceType": "github",
       "skillPath": "skills/python-pro/SKILL.md",
-      "computedHash": "fae3b07d03d2eb9f9112ceab0ef498ebafab33f1e095dff8c5a36de55ef68445"
+      "computedHash": "e1ab7c98670500555f2dff7efa3fd3b9c9a24c8cf8c071bffe445ff15d04dbf8"
+    },
+    "qa-do": {
+      "source": "petrkindlmann/qa-skills",
+      "sourceType": "github",
+      "skillPath": "skills/qa-do/SKILL.md",
+      "computedHash": "df85f1413a99a6f36618ed7bebab62ef72c7643d28f4315b933f458d76ad043c"
+    },
+    "qa-project-context": {
+      "source": "petrkindlmann/qa-skills",
+      "sourceType": "github",
+      "skillPath": "skills/qa-project-context/SKILL.md",
+      "computedHash": "61406224ec96704835eea522f7703cf0430146919f344589e890c1cac5659d64"
+    },
+    "qa-start": {
+      "source": "petrkindlmann/qa-skills",
+      "sourceType": "github",
+      "skillPath": "skills/qa-start/SKILL.md",
+      "computedHash": "d2c03cc3184685d051882a9dcdfeac372ba730592801ecb8d7f7da0ffdb761f9"
+    },
+    "security-testing": {
+      "source": "petrkindlmann/qa-skills",
+      "sourceType": "github",
+      "skillPath": "skills/security-testing/SKILL.md",
+      "computedHash": "b3dd95fc8791a87e8c474f0149115fa386b55778b7e3c7e5dd499ec6124b9320"
+    },
+    "test-strategy": {
+      "source": "petrkindlmann/qa-skills",
+      "sourceType": "github",
+      "skillPath": "skills/test-strategy/SKILL.md",
+      "computedHash": "5fefee0bcaa0a7f280480d77f7f005bdac3378ea3944aafe4d571f628b4abd62"
     },
     "wayfinder": {
       "source": "mattpocock/skills",
       "sourceType": "github",
       "skillPath": "skills/engineering/wayfinder/SKILL.md",
-      "computedHash": "f343ecf46157cb645a5494644418308ad95391e9fc696faa47ae5a412bf5f6e4"
+      "computedHash": "71d1296ae9f1ea0397f385f72d11ca3473827f5d067df4d06c58eb03377a57ce"
     }
   }
 }
