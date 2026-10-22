@@ -5,7 +5,7 @@ Stream local media files in Stremio via an HTTP file server.
 ## Architecture
 
 ```
-Stremio → Addon (Node.js:7000) → File Server (Python:3003) → Local Disk
+Stremio → Addon (Node.js:7001) → File Server (Python:3003) → Local Disk
 ```
 
 - **Addon** serves the Stremio protocol (catalog, streams)
