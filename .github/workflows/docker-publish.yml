@@ -9,7 +9,15 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
+  # Gate: the same critical-flow suite that runs on pull requests. A red suite
+  # stops the image build entirely, so a broken contract cannot be published.
+  test:
+    uses: ./.github/workflows/qa.yml
+    permissions:
+      contents: read
+
   build:
+    needs: test
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
