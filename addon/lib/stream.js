@@ -26,10 +26,14 @@ function buildStreamUrl(filePath) {
 // Local sidecars arrive from /api/list as { name, path, lang }; external providers
 // arrive from /api/subtitle/search with a ready-made url. Both must end up as a
 // url the Stremio client can fetch — a subtitle without one never loads.
-function subtitleUrl(sub) {
+function subtitleUrl(sub, videoPath) {
   if (sub.url) return sub.url;
-  if (!sub.path) return null;
-  return buildStreamUrl(sub.path);
+  if (sub.path) return buildStreamUrl(sub.path);
+  if (sub.name && videoPath) {
+    const dir = videoPath.split("/").slice(0, -1).join("/");
+    if (dir) return buildStreamUrl(`${dir}/${sub.name}`);
+  }
+  return null;
 }
 
 module.exports = async function (args) {
@@ -58,7 +62,7 @@ module.exports = async function (args) {
       subtitles: subs
         .map((sub, i) => ({
           id: sub.id || `sub-${i}`,
-          url: subtitleUrl(sub),
+          url: subtitleUrl(sub, match.path),
           lang: langToCode(sub.lang || sub.name),
           name: sub.name || sub.lang,
         }))
