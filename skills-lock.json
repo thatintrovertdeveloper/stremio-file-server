@@ -11,13 +11,13 @@
       "source": "mattpocock/skills",
       "sourceType": "github",
       "skillPath": "skills/engineering/code-review/SKILL.md",
-      "computedHash": "57cfd4ceb011f05e58a1a4f4cad3b2e03419d371f8990f4bcb32ff0d435a039f"
+      "computedHash": "c2745e2be960b82b9fddd82cf45265f42431e7b045c403f297b25f0f311e9210"
     },
     "git-workflow": {
       "source": "netresearch/git-workflow-skill",
       "sourceType": "github",
       "skillPath": "skills/git-workflow/SKILL.md",
-      "computedHash": "880f699ed9793380b6cd22cafcd1cf43bf29c596870c883e6e2aa3749566f891"
+      "computedHash": "7b73df5a0c8b2a47dd3fc2e6b0a335146730a44166c96a051476241be29e4bb2"
     },
     "interface-kit": {
       "source": "JuliusBrussee/skills",
@@ -67,6 +67,12 @@
       "skillPath": "skills/security-testing/SKILL.md",
       "computedHash": "b3dd95fc8791a87e8c474f0149115fa386b55778b7e3c7e5dd499ec6124b9320"
     },
+    "stremio-addon-workflow": {
+      "source": "themrclaus/omniomobile",
+      "sourceType": "github",
+      "skillPath": ".github/skills/stremio-addon-workflow/SKILL.md",
+      "computedHash": "218309d69f897a46a1915798d979f4d99b243777b9eb89d13324c36001990157"
+    },
     "test-strategy": {
       "source": "petrkindlmann/qa-skills",
       "sourceType": "github",
@@ -77,7 +83,7 @@
       "source": "mattpocock/skills",
       "sourceType": "github",
       "skillPath": "skills/engineering/wayfinder/SKILL.md",
-      "computedHash": "71d1296ae9f1ea0397f385f72d11ca3473827f5d067df4d06c58eb03377a57ce"
+      "computedHash": "22338d9356ef84430c5ca916f2632f226583d9d7366433f62bfde5b1b6781e9e"
     }
   }
 }
