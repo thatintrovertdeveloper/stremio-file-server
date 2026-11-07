@@ -10,3 +10,5 @@ media/
 # QA artifacts (regenerable)
 .qa/
 qa-results/
+.pi/
+.skills/
