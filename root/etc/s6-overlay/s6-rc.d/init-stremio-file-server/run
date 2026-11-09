@@ -4,19 +4,10 @@ set -euo pipefail
 
 echo "[init-stremio-file-server] preparing /config"
 
-# LSIO permission model: map abc to host PUID/PGID before services start.
-PUID=${PUID:-1000}
-PGID=${PGID:-1000}
-if [ "$(id -u abc)" != "$PUID" ]; then
-  usermod -o -u "$PUID" abc
-fi
-if [ "$(id -g abc)" != "$PGID" ]; then
-  groupmod -o -g "$PGID" abc
-fi
 
 # Persistent app state lives under /config (LSIO convention).
 mkdir -p /config/subtitles-cache
-s6-chownuser /config || chown -R "$PUID:$PGID" /config || true
+chown "${PUID:-911}:${PGID:-911}" /config 2>/dev/null || true
 
 # Media is read-only by design; sanity-check it exists so the scanner
 # fails fast with a clear message instead of an empty catalog.
