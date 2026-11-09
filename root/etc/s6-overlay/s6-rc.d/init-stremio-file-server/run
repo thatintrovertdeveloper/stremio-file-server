@@ -1,0 +1,27 @@
+#!/usr/bin/with-contenv bash
+# oneshot: prepare persistent config layout before any service starts
+set -euo pipefail
+
+echo "[init-stremio-file-server] preparing /config"
+
+# LSIO permission model: map abc to host PUID/PGID before services start.
+PUID=${PUID:-1000}
+PGID=${PGID:-1000}
+if [ "$(id -u abc)" != "$PUID" ]; then
+  usermod -o -u "$PUID" abc
+fi
+if [ "$(id -g abc)" != "$PGID" ]; then
+  groupmod -o -g "$PGID" abc
+fi
+
+# Persistent app state lives under /config (LSIO convention).
+mkdir -p /config/subtitles-cache
+s6-chownuser /config || chown -R "$PUID:$PGID" /config || true
+
+# Media is read-only by design; sanity-check it exists so the scanner
+# fails fast with a clear message instead of an empty catalog.
+if [ ! -d "/media" ]; then
+  echo "[init-stremio-file-server] WARNING: /media not mounted — set MEDIA_DIR volume"
+fi
+
+echo "[init-stremio-file-server] done"

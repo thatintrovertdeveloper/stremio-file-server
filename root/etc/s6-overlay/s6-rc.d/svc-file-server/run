@@ -1,0 +1,7 @@
+#!/usr/bin/with-contenv bash
+set -euo pipefail
+
+export PORT="${PORT:-3003}"
+
+echo "[svc-file-server] starting file-server on port ${PORT}"
+exec s6-setuidgid abc /app/venv/bin/python /app/file-server/server.py --port "${PORT}"

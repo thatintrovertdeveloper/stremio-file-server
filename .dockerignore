@@ -1,0 +1,12 @@
+# Keeps build context small; applies to root-context LSIO Dockerfiles.
+.git
+.github
+.qa
+qa-results
+**/__pycache__
+**/.DS_Store
+addon/node_modules
+tests
+.data
+*.md
+!root/**

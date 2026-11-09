@@ -141,3 +141,30 @@ environment:
 - [x] Multi-directory support
 - [x] TMDB metadata support
 - [x] OpenSubtitles subtitle support
+
+## LinuxServer.io-style variant (optional all-in-one)
+
+Single-container LSIO variant with s6-overlay supervision, PUID/PGID permission
+model and `/config` persistence. Runs **both** services (file-server + Stremio
+addon) in one container — addon talks to the file server via `localhost:3003`.
+
+Files:
+
+- `Dockerfile.alpine` / `Dockerfile.ubuntu` — dual-base, multi-arch (amd64/arm64)
+- `root/etc/s6-overlay/...` — `init-stremio-file-server` (oneshot: PUID/PGID + `/config`) plus
+  longrun services `svc-file-server` (port 3003) and `svc-addon` (port 7001)
+- `docker-bake.hcl` — build targets for both bases
+- `docker-compose.lsio.yml` — ready-to-run compose example
+- `.github/workflows/build.yml` — bake-plan validation + per-variant build checks
+
+Run:
+
+```bash
+docker compose -f docker-compose.lsio.yml up --build
+# or pick base explicitly
+docker build -f Dockerfile.ubuntu -t stremio-file-server:ubuntu .
+```
+
+Install as Stremio addon: `http://localhost:7001/manifest.json` (same protocol as
+the two-container setup). Media stays read-only under `/media`; persistent app
+state lives in `/config`.

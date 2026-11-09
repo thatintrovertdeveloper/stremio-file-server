@@ -1,0 +1,42 @@
+# syntax=docker/dockerfile:1
+
+# LinuxServer.io-style all-in-one image: file-server (FastAPI) + Stremio addon
+# supervised by s6-overlay. Runs as abc (PUID/PGID), media mounted read-only.
+
+FROM ghcr.io/linuxserver/baseimage-alpine:3.22
+
+ARG BUILD_DATE
+ARG VERSION
+ARG RELEASE=latest
+LABEL build_version="Linuxserver.io version:- ${VERSION} Build-date:- ${BUILD_DATE}" \
+      org.opencontainers.image.title="stremio-file-server" \
+      org.opencontainers.image.description="All-in-one LSIO-style image: local media file server + Stremio addon" \
+      org.opencontainers.image.source="https://github.com/thatintrovertdeveloper/stremio-file-server"
+
+# ffmpeg for thumbnails, python for file-server, node for the addon
+RUN apk add --no-cache \
+      ffmpeg \
+      python3 \
+      py3-pip \
+      nodejs \
+      npm \
+      curl
+
+# ---- file-server (python venv) ----
+COPY file-server/requirements.txt /tmp/requirements.txt
+RUN python3 -m venv /app/venv \
+      && /app/venv/pip install --no-cache-dir -r /tmp/requirements.txt \
+      && rm -f /tmp/requirements.txt
+
+COPY file-server/ /app/file-server/
+
+# ---- addon (node) ----
+COPY addon/package.json addon/package-lock.json /app/addon/
+RUN cd /app/addon && npm ci --omit=dev --no-audit --no-fund
+COPY addon/ /app/addon/
+
+# ---- s6 service definitions ----
+COPY root/ /
+
+VOLUME /config
+EXPOSE 3003 7001

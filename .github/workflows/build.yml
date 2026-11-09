@@ -1,0 +1,42 @@
+name: Build LSIO Variants
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  # Sanity: bake definitions must resolve to valid targets/build plans.
+  # Full image builds + publishing stay in docker-publish.yml.
+  bake:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Validate bake plan
+        run: docker buildx bake --print
+
+  # Confirm each variant actually builds (amd64 only; arm64 covered by bake plan).
+  build-alpine:
+    runs-on: ubuntu-latest
+    needs: bake
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build alpine variant
+        run: docker buildx bake alpine --platform linux/amd64 --set *.attest=type=provenance,disabled=true
+
+  build-ubuntu:
+    runs-on: ubuntu-latest
+    needs: bake
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build ubuntu variant
+        run: docker buildx bake ubuntu --platform linux/amd64

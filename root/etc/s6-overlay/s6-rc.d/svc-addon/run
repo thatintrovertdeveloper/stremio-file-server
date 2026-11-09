@@ -1,0 +1,7 @@
+#!/usr/bin/with-contenv bash
+set -euo pipefail
+
+export PORT="${PORT:-7001}"
+
+echo "[svc-addon] starting stremio addon on port ${PORT}"
+exec s6-setuidgid abc node /app/addon/index.js
