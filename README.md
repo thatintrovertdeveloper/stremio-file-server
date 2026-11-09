@@ -156,11 +156,33 @@ Files:
 - `docker-bake.hcl` — build targets for both bases
 - `docker-compose.lsio.yml` — ready-to-run compose example
 - `.github/workflows/build.yml` — bake-plan validation + per-variant build checks
+- `.github/workflows/docker-publish.yml` — `lsio-build` (per-arch bake, digest push)
+  + `lsio-merge` (multi-arch manifest)
+
+Published tags (multi-arch `amd64`/`arm64`):
+
+| Tag | Meaning |
+|-----|---------|
+| `:latest` | split file-server (unchanged) |
+| `:alpine` | all-in-one, Alpine base |
+| `:ubuntu` | all-in-one, Ubuntu noble base |
+| `:lsio-latest` | alias for `:alpine` on `main` |
+| `:<base>-sha-<short>` | per-commit |
+| `:<base>-vX.Y.Z` | release tags |
+
+`latest` deliberately stays on the split file-server image so existing
+two-container deployments are never silently swapped for the all-in-one one.
 
 Run:
 
 ```bash
-docker compose -f docker-compose.lsio.yml up --build
+# published image (LSIO_BASE=alpine|ubuntu)
+docker compose -f docker-compose.lsio.yml up -d
+
+# build from source instead
+docker compose -f docker-compose.lsio.yml up -d --build
+LSIO_BASE=ubuntu docker compose -f docker-compose.lsio.yml up -d --build
+
 # or pick base explicitly
 docker build -f Dockerfile.ubuntu -t stremio-file-server:ubuntu .
 ```

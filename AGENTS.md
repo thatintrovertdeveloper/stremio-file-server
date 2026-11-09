@@ -9,12 +9,35 @@ Two services over HTTP:
 
 Stremio → addon → file server API → stream directly from file server.
 
+Two packaging shapes, same code:
+
+- **split** — `docker-compose.yml`: two containers (`file-server` on 3003, `addon` on 7001).
+- **LSIO all-in-one** — `Dockerfile.alpine` / `Dockerfile.ubuntu`: both services in one
+  s6-overlay container as user `abc`, ports 3003 + 7001, `/config` persistence.
+
 ## Run
+
+Split (two containers):
 
 ```bash
 cp .env.example .env  # set MEDIA_DIR, API_KEY, TMDB_API_READ_ACCESS_TOKEN
 docker-compose up -d
 ```
+
+LSIO all-in-one:
+
+```bash
+cp .env.example .env  # MEDIA_DIR is mandatory here too
+
+docker compose -f docker-compose.lsio.yml up -d --build   # add --build for source
+LSIO_BASE=ubuntu docker compose -f docker-compose.lsio.yml up -d --build
+# or pick a base explicitly
+docker build -f Dockerfile.alpine -t stremio-file-server:alpine .
+docker buildx bake alpine            # HCL targets, multi-arch
+docker buildx bake --print           # validate bake plan only
+```
+
+Addon install URL (both shapes): `http://<host>:7001/manifest.json`.
 
 ## Verify
 
@@ -50,6 +73,11 @@ curl http://localhost:3003/health
 # Catalog/stream (with API key)
 curl -H "X-API-Key: $KEY" http://localhost:7001/catalog/movie/local.json
 curl -H "X-API-Key: $KEY" "http://localhost:7001/stream/movie/FILENAME.json"
+
+# LSIO all-in-one smoke (both services live in one container)
+curl http://localhost:3003/health
+curl http://localhost:7001/manifest.json
+curl -s http://localhost:3003/api/list | head -c 200   # empty ⇒ check MEDIA_DIR mount
 ```
 
 CI runs `scripts/qa-e2e.sh` on every PR and blocks image publishing (`.github/workflows/qa.yml`,
@@ -75,6 +103,16 @@ called by `docker-publish.yml`). No linter config, no typecheck, no unit tests y
 - **SOURCE_DIRS needs matching volumes** — Each dir in `SOURCE_DIRS` must have a corresponding `volumes:` entry in docker-compose.yml.
 - **CI: native arm64 runners** — QEMU too slow. Workflow uses `ubuntu-24.04-arm` for arm64, `ubuntu-latest` for amd64. Each arch builds + pushes by digest separately, then merge job creates multi-arch manifest.
 - **TMDB is optional** — No token = current behavior (file thumbnails). Token set = enriches posters/descriptions/ratings. Falls back gracefully on search miss or API error. Rate-limited to 40 req/10s, 24h cache.
+- **s6 oneshot needs BOTH `run` and `up`** — LSIO baseimage convention: `init-<x>/run` holds the script, `init-<x>/up` is a one-line file containing the path `/etc/s6-overlay/s6-rc.d/init-<x>/run`. A bare `up` script fails with `s6-rc-oneshot-run: fatal: unable to exec set: No such file or directory`.
+- **Do not remap PUID/PGID yourself** — baseimage's `init-adduser` already does it. Duplicate `usermod`/`groupmod` in your own oneshot races its lock ("lock /etc/passwd.lock already used by PID …"). Declare `dependencies.d/init-adduser` instead and use `${PUID:-911}`.
+- **`s6-chownuser` does not exist** — s6-overlay ships `s6-chown`. Plain `chown` in an init script is fine.
+- **Python venv pip path** — `/app/venv/bin/pip`, not `/app/venv/pip`. Wrong path gives `exit code: 127`.
+- **Ubuntu variant needs NodeSource** — noble's apt `nodejs` is too old; Dockerfile.ubuntu adds the node_20.x repo. Alpine gets `nodejs`/`npm` from apk.
+- **`docker buildx bake` has no `--platform` flag** — override with `--set "<target>.platform=linux/amd64"`, or edit `platforms` in `docker-bake.hcl`. Passing `--platform` exits 125.
+- **bake variables are env vars, not `--set`** — `--set` is target attributes only; `--set "REGISTRY_IMAGE=..."` fails with `invalid override key REGISTRY_IMAGE, expected target.name`. Set the declared HCL variable through the environment instead.
+- **`:latest` belongs to the split file-server** — the LSIO all-in-one variants publish `:alpine` / `:ubuntu` (+ `:lsio-latest` alias on main) and never touch `:latest`, so two-container deployments are not silently swapped.
+- **All-in-one `/media` is a separate mount from `./media`** — if `MEDIA_DIR` is unset, compose mounts the fallback `./media` (empty) and both `/api/list` and catalog return empty. Symptom looks like a broken addon; check `/media` first.
+- **Container can lose its network** — after a daemon/network reset a running container may keep only `lo` (`docker network inspect` shows `"Containers": {}`) while health checks still pass over loopback. Published ports then refuse connections. `docker network connect <project>_default <container>` restores it live; `up -d --force-recreate` is the durable fix.
 
 ## Content Detection
 
@@ -89,6 +127,16 @@ File server classifies each video:
 ## Structure
 
 ```
+Dockerfile.alpine    # LSIO all-in-one: file-server + addon, s6-overlay, alpine base
+Dockerfile.ubuntu    # same, ubuntu noble base + NodeSource node 20
+docker-bake.hcl      # bake targets (alpine, ubuntu) × amd64/arm64
+.dockerignore        # root-context builds stay small (no node_modules/.qa/.git)
+root/etc/s6-overlay/s6-rc.d/
+  init-stremio-file-server/   # oneshot: run + up + dependencies.d/init-adduser
+  svc-file-server/            # longrun: venv python on $PORT (3003)
+  svc-addon/                  # longrun: node index.js on $PORT (7001)
+  user/contents.d/            # registers init + both services
+
 file-server/
   server.py          # FastAPI app (scanner, streaming, thumbnails, subtitle detection)
   requirements.txt   # fastapi, uvicorn, aiofiles, python-multipart
@@ -114,8 +162,12 @@ scripts/
   qa-e2e.sh          # service lifecycle + suite (the CI entrypoint)
 
 qa.config.json       # check definition consumed by the qa runner
-docker-compose.yml   # both services, read-only media mount
+docker-compose.yml        # split: two services, read-only media mount
+docker-compose.lsio.yml   # all-in-one LSIO container (PUID/PGID/TZ, /config)
 .github/workflows/
   qa.yml             # critical-flow suite on PR + main, callable
-  docker-publish.yml # multi-arch images; build job needs the test job
+  docker-publish.yml # multi-arch images (split shape); build job needs the test job
+  build.yml          # bake-plan validation + per-variant amd64 builds (LSIO shape)
+                     # docker-publish.yml also runs lsio-build + lsio-merge:
+                     #   per-arch `buildx bake <base>` digest push -> manifest
 ```

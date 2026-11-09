@@ -1,7 +1,7 @@
 services:
   file-server:
-    build: ./file-server
-    container_name: file-server
+    image: ghcr.io/thatintrovertdeveloper/stremio-file-server:latest
+    container_name: stremio-file-server
     ports:
       - "3003:3003"
     volumes:
@@ -20,21 +20,26 @@ services:
       - SUBTITLE_CACHE_TTL=${SUBTITLE_CACHE_TTL:-86400}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3003/health')"]
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3003/health')"]
       interval: 30s
       timeout: 5s
       retries: 3
+    networks:
+      - proxy
 
   addon:
-    build: ./addon
+    image: ghcr.io/thatintrovertdeveloper/stremio-file-server-addon:latest
     container_name: stremio-addon
     ports:
-      - "7001:7001"
+      - "7101:7001"
     depends_on:
       file-server:
         condition: service_healthy
     environment:
-      - FILE_SERVER_URL=${FILE_SERVER_URL:-http://file-server:3003}
+      # in-cluster call: service name, not localhost
+      - FILE_SERVER_URL=http://file-server:3003
+      # client-facing URL used for posters/streams — must be reachable by the
+      # Stremio client. Change to your public origin (e.g. https://serve.example.com)
       - FILE_SERVER_PUBLIC_URL=${FILE_SERVER_PUBLIC_URL:-http://localhost:3003}
       - FILE_SERVER_API_KEY=${API_KEY:-}
       - TMDB_API_READ_ACCESS_TOKEN=${TMDB_API_READ_ACCESS_TOKEN:-}
@@ -42,6 +47,16 @@ services:
       - TMDB_LANGUAGE=${TMDB_LANGUAGE:-en-US}
       - PORT=7001
     restart: unless-stopped
+    networks:
+      - proxy
+    labels:
+      caddy: serve.rotsenacob.com
+      caddy.reverse_proxy: "{{upstreams 7001}}"
+      caddy.import: "guard"
 
 volumes:
   subtitle-cache:
+
+networks:
+  proxy:
+    external: true

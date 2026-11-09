@@ -2,9 +2,12 @@
 # Build: docker compose -f docker-compose.lsio.yml up --build
 services:
   stremio-file-server:
+    # Published variants: :alpine / :ubuntu (see docker-bake.hcl, lsio-* jobs in
+    # docker-publish.yml). `docker compose up --build` builds from source instead.
+    image: ghcr.io/thatintrovertdeveloper/stremio-file-server:${LSIO_BASE:-alpine}
     build:
       context: .
-      dockerfile: Dockerfile.alpine
+      dockerfile: Dockerfile.${LSIO_BASE:-alpine}
     container_name: stremio-file-server
     ports:
       - "7001:7001"            # addon (avoid 7000: AirPlay blocks it on macOS)
