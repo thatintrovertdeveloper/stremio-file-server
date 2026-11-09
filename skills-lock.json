@@ -31,6 +31,12 @@
       "skillPath": "skills/javascript-pro/SKILL.md",
       "computedHash": "56a5b700d1a755a90dcb6b5a53b748ed68e5f569238aaa1dd7b354504e54783c"
     },
+    "linuxserver-image-scaffold": {
+      "source": "bjesuiter/skills",
+      "sourceType": "github",
+      "skillPath": "skills/linuxserver-image-scaffold/SKILL.md",
+      "computedHash": "22a496a4655293ed54393f50a3a9da756ebf0059034ca474bb2acfb7e597af57"
+    },
     "multi-stage-dockerfile": {
       "source": "github/awesome-copilot",
       "sourceType": "github",
