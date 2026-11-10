@@ -1,6 +1,7 @@
 const { FILE_SERVER_PUBLIC_URL, FILE_SERVER_API_KEY, fetchFileList } = require("./file-server");
 const { fetchExternalSubtitles } = require("./subtitle");
 const { parseFilename } = require("./matcher");
+const { resolveByImdb } = require("./imdb");
 
 const LANG_NAME_TO_CODE = {
   english: "eng", spanish: "spa", french: "fre", german: "ger", italian: "ita",
@@ -39,7 +40,13 @@ function subtitleUrl(sub, videoPath) {
 module.exports = async function (args) {
   try {
     const files = await fetchFileList();
-    const match = files.find((f) => f.flatPath === args.id);
+    let match = files.find((f) => f.flatPath === args.id);
+
+    // Catalog/meta requests carry flatPath ids, but Cinemeta-resolved plays
+    // carry "tt..." (movie) or "tt...:s:e" (series episode) ids instead.
+    if (!match) {
+      match = await resolveByImdb(files, args.type, args.id);
+    }
 
     if (!match) {
       return { streams: [] };

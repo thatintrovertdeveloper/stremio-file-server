@@ -310,6 +310,20 @@ describe("addon: Stremio protocol", () => {
     assert.deepEqual(body.streams, []);
   });
 
+  test("Cinemeta-style stream ids fall back to empty streams without a 5xx", async () => {
+    // Stremio queries addons with "tt..." ids when a title is resolved through
+    // Cinemeta instead of the addon's own catalog-meta ids. The resolver must
+    // treat unresolvable ids gracefully; a 5xx here shows up to Stremio as
+    // "Stream failed to load" even though the local library has the file.
+    for (const id of ["999:1:1", "tt9999999:99:99"]) {
+      const { res, body } = await json(
+        `${ADDON}/stream/series/${encodeURIComponent(id)}.json`
+      );
+      assert.equal(res.status, 200);
+      assert.ok(Array.isArray(body.streams), `empty streams array for id "${id}"`);
+    }
+  });
+
   test("every subtitle offered to Stremio carries a playable url", async () => {
     // Regression lock for F2: file-server returns local sidecars as {name, path, lang}
     // while external providers use {url}. stream.js must build a URL for both.

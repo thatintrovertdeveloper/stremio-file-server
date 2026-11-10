@@ -119,6 +119,16 @@ async function getTVEpisode(tvId, seasonNumber, episodeNumber) {
   return tmdbFetch(`/tv/${tvId}/season/${seasonNumber}/episode/${episodeNumber}`, params);
 }
 
+async function findMovie(imdbId) {
+  const data = await tmdbFetch(`/find/${imdbId}`, { external_source: "imdb_id" });
+  return data?.movie_results?.[0] || null;
+}
+
+async function findTV(imdbId) {
+  const data = await tmdbFetch(`/find/${imdbId}`, { external_source: "imdb_id" });
+  return data?.tv_results?.[0] || null;
+}
+
 function getImageUrl(path, size = "w500") {
   if (!path) return null;
   return `${TMDB_IMAGE_BASE}/${size}${path}`;
@@ -131,6 +141,8 @@ function isEnabled() {
 module.exports = {
   searchMovie,
   searchTV,
+  findMovie,
+  findTV,
   getMovie,
   getTV,
   getTVSeason,
