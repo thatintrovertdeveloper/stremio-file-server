@@ -73,6 +73,17 @@ async function buildTitleCandidates(type, imdbId) {
         }
       );
       year = yearOf(data.release_date || data.first_air_date) || year;
+
+      // A release named after the romanized original (or any localization) only
+      // matches through TMDB's alternative-title list.
+      const alt =
+        type === "series"
+          ? await tmdb.getTVAlternativeTitles(data.id)
+          : await tmdb.getMovieAlternativeTitles(data.id);
+      (alt || []).forEach((r) => {
+        const n = normalizeTitle(r.title);
+        if (n) candidates.add(n);
+      });
     }
   }
 

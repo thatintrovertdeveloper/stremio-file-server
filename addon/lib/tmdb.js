@@ -129,6 +129,19 @@ async function findTV(imdbId) {
   return data?.tv_results?.[0] || null;
 }
 
+// Alternative titles matter for localization: a file named after a show's
+// romanized original (e.g. "Shiawase Kanako no Koroshiya Seikatsu") only
+// matches via TMDB's alternative-title list, not via its English name.
+async function getTVAlternativeTitles(tvId) {
+  const data = await tmdbFetch(`/tv/${tvId}/alternative_titles`);
+  return data?.results || [];
+}
+
+async function getMovieAlternativeTitles(movieId) {
+  const data = await tmdbFetch(`/movie/${movieId}/alternative_titles`);
+  return data?.results || [];
+}
+
 function getImageUrl(path, size = "w500") {
   if (!path) return null;
   return `${TMDB_IMAGE_BASE}/${size}${path}`;
@@ -143,6 +156,8 @@ module.exports = {
   searchTV,
   findMovie,
   findTV,
+  getTVAlternativeTitles,
+  getMovieAlternativeTitles,
   getMovie,
   getTV,
   getTVSeason,
