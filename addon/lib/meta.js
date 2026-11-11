@@ -29,6 +29,7 @@ module.exports = async function (args) {
         type: "series",
         name: showTitle,
         poster: buildThumbUrl(firstEp.flatPath),
+        posterShape: "landscape",
         background: buildThumbUrl(firstEp.flatPath),
         description: `${episodes.length} episodes`,
         videos: episodes
@@ -45,7 +46,11 @@ module.exports = async function (args) {
       };
 
       if (tmdbShow) {
-        meta.poster = tmdb.getImageUrl(tmdbShow.poster_path) || meta.poster;
+        const tmdbPoster = tmdb.getImageUrl(tmdbShow.poster_path);
+        if (tmdbPoster) {
+          meta.poster = tmdbPoster;
+          meta.posterShape = "poster";
+        }
         meta.background = tmdb.getImageUrl(tmdbShow.backdrop_path, "original") || meta.background;
         meta.description = tmdbShow.overview || meta.description;
         if (tmdbShow.first_air_date) {
@@ -59,7 +64,9 @@ module.exports = async function (args) {
               return {
                 ...ep,
                 title: epData.name || ep.title,
-                description: epData.overview,
+                // `overview` is the Video object's summary field; there is no
+                // `description` on a Video, so a TMDB overview sent there is dropped.
+                overview: epData.overview,
                 thumbnail: tmdb.getImageUrl(epData.still_path),
               };
             }
@@ -86,6 +93,7 @@ module.exports = async function (args) {
       type: "movie",
       name: match.name,
       poster: buildThumbUrl(match.flatPath),
+      posterShape: "landscape",
       background: buildThumbUrl(match.flatPath),
       description: [
         match.folderName,
@@ -97,7 +105,11 @@ module.exports = async function (args) {
     };
 
     if (tmdbMovie) {
-      meta.poster = tmdb.getImageUrl(tmdbMovie.poster_path) || meta.poster;
+      const tmdbPoster = tmdb.getImageUrl(tmdbMovie.poster_path);
+      if (tmdbPoster) {
+        meta.poster = tmdbPoster;
+        meta.posterShape = "poster";
+      }
       meta.background = tmdb.getImageUrl(tmdbMovie.backdrop_path, "original") || meta.background;
       meta.description = tmdbMovie.overview || meta.description;
       if (tmdbMovie.release_date) {

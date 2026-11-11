@@ -17,7 +17,6 @@ const manifest = {
   ],
   resources: ["catalog", "meta", "stream"],
   types: ["movie", "series"],
-  idPrefixes: [""],
 };
 
 module.exports = manifest;

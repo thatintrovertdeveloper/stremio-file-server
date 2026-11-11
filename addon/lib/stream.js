@@ -71,12 +71,17 @@ module.exports = async function (args) {
           id: sub.id || `sub-${i}`,
           url: subtitleUrl(sub, match.path),
           lang: langToCode(sub.lang || sub.name),
-          name: sub.name || sub.lang,
+          // `label` is the spec's field for the picker text; `name` is not part
+          // of a Subtitle object and is silently dropped by Stremio. Needed here
+          // because "X.eng.srt" and "X.forced.eng.srt" both resolve to lang "eng".
+          label: sub.name || sub.lang,
         }))
         .filter((sub) => sub.url),
       behaviorHints: {
         notWebReady: true,
         filename: match.flatPath,
+        // Passed to subtitle addons so they can match the exact file.
+        videoSize: match.size,
       },
     };
 

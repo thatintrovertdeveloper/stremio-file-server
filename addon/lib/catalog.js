@@ -1,5 +1,6 @@
 const { fetchFileList, searchTMDB, buildThumbUrl } = require("./file-server");
 const tmdb = require("./tmdb");
+const matcher = require("./matcher");
 
 module.exports = async function (args) {
   try {
@@ -18,7 +19,7 @@ module.exports = async function (args) {
 
       const metas = await Promise.all(
         Array.from(shows.entries()).map(async ([title, firstEpisode]) => {
-          const parsed = require("./matcher").parseFilename(title, "series");
+          const parsed = matcher.parseFilename(title, "series");
           const tmdbData = await searchTMDB(parsed.title, parsed.year, "series");
 
           const meta = {
@@ -26,12 +27,19 @@ module.exports = async function (args) {
             type: "series",
             name: title,
             poster: buildThumbUrl(firstEpisode.flatPath),
+            // A file-server thumbnail is an ffmpeg frame scaled to 16:9, not a
+            // 1:0.675 poster. Stremio crops/stretches it unless we say so.
+            posterShape: "landscape",
             background: buildThumbUrl(firstEpisode.flatPath),
-            description: `${files.filter((f) => f.title === title).length} episodes`,
+            description: `${files.filter((f) => f.type === "series" && f.title === title).length} episodes`,
           };
 
           if (tmdbData) {
-            meta.poster = tmdb.getImageUrl(tmdbData.poster_path) || meta.poster;
+            const tmdbPoster = tmdb.getImageUrl(tmdbData.poster_path);
+            if (tmdbPoster) {
+              meta.poster = tmdbPoster;
+              meta.posterShape = "poster";
+            }
             meta.background = tmdb.getImageUrl(tmdbData.backdrop_path, "original") || meta.background;
             meta.description = tmdbData.overview || meta.description;
             if (tmdbData.first_air_date) {
@@ -49,7 +57,7 @@ module.exports = async function (args) {
     const movies = files.filter((f) => f.type === "movie");
     const metas = await Promise.all(
       movies.map(async (file) => {
-        const parsed = require("./matcher").parseFilename(file.name, "movie");
+        const parsed = matcher.parseFilename(file.name, "movie");
         const tmdbData = await searchTMDB(parsed.title, parsed.year, "movie");
 
         const meta = {
@@ -57,6 +65,7 @@ module.exports = async function (args) {
           type: "movie",
           name: file.name,
           poster: buildThumbUrl(file.flatPath),
+          posterShape: "landscape",
           background: buildThumbUrl(file.flatPath),
           description: [
             file.folderName,
@@ -68,7 +77,11 @@ module.exports = async function (args) {
         };
 
         if (tmdbData) {
-          meta.poster = tmdb.getImageUrl(tmdbData.poster_path) || meta.poster;
+          const tmdbPoster = tmdb.getImageUrl(tmdbData.poster_path);
+          if (tmdbPoster) {
+            meta.poster = tmdbPoster;
+            meta.posterShape = "poster";
+          }
           meta.background = tmdb.getImageUrl(tmdbData.backdrop_path, "original") || meta.background;
           meta.description = tmdbData.overview || meta.description;
           if (tmdbData.release_date) {

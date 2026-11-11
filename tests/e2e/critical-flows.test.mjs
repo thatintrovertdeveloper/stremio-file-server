@@ -259,6 +259,9 @@ describe("addon: Stremio protocol", () => {
     assert.ok(movie, "the fixture movie must appear in the catalog");
     assert.equal(movie.type, "movie");
     assert.equal(movie.poster, `${PUBLIC_URL}/api/thumbnail/${encodeURIComponent(MOVIE)}?key=${KEY}`);
+    // The thumbnail is an ffmpeg frame scaled to 16:9; the default posterShape
+    // (1:0.675) makes Stremio crop it.
+    assert.equal(movie.posterShape, "landscape");
     assert.match(movie.description, /Complete/);
   });
 
@@ -268,6 +271,7 @@ describe("addon: Stremio protocol", () => {
     assert.equal(ids.filter((id) => id === `__series__${SHOW}`).length, 1, "one entry per show");
     const show = body.metas.find((m) => m.id === `__series__${SHOW}`);
     assert.equal(show.type, "series");
+    assert.equal(show.posterShape, "landscape");
     assert.match(show.description, /^2 episodes$/);
     assert.ok(!ids.some((id) => id.includes(MOVIE)), "movies must not leak into the series catalog");
   });
@@ -282,6 +286,11 @@ describe("addon: Stremio protocol", () => {
       "Breaking.Bad.S01E02.720p.mkv",
     ]);
     assert.deepEqual(body.meta.videos.map((v) => [v.season, v.episode]), [[1, 1], [1, 2]]);
+    // A Video object carries `overview`, never `description` — a TMDB overview
+    // sent to `description` is silently dropped by Stremio.
+    for (const video of body.meta.videos) {
+      assert.ok(!("description" in video), `${video.id} must use overview, not description`);
+    }
     assert.match(body.meta.videos[0].title, /^S01E01 - /);
   });
 
@@ -331,17 +340,26 @@ describe("addon: Stremio protocol", () => {
     const subs = body.streams[0].subtitles;
     assert.equal(subs.length, 2, "both local sidecars should be offered");
     for (const sub of subs) {
-      assert.ok(sub.url, `subtitle "${sub.name}" has no url — Stremio cannot load it`);
+      assert.ok(sub.url, `subtitle "${sub.label}" has no url — Stremio cannot load it`);
       assert.ok(sub.url.startsWith(PUBLIC_URL), "subtitle url must be client-reachable");
       assert.ok(sub.url.includes("key="), "subtitle url must carry the API key");
+      // Subtitle Object: id / url / lang are required, label is what the picker shows.
+      assert.ok(sub.id, "subtitle needs an id to be told apart from its siblings");
+      assert.ok(sub.lang, "subtitle needs a lang");
+      assert.ok(sub.label, "subtitle needs a label or the picker shows the raw lang code");
     }
+    assert.equal(
+      new Set(subs.map((sub) => sub.label)).size,
+      subs.length,
+      "eng + forced.eng collapse to the same lang code, so the labels must differ",
+    );
   });
 
   test("each offered subtitle url actually serves its sidecar", async () => {
     const { body } = await json(`${ADDON}/stream/series/${EPISODE}.json`);
     for (const sub of body.streams[0].subtitles) {
       const res = await fetch(sub.url);
-      assert.equal(res.status, 200, `${sub.name} url must resolve`);
+      assert.equal(res.status, 200, `${sub.label} url must resolve`);
       assert.match(res.headers.get("content-type") || "", /^text\/plain/);
       assert.match(await res.text(), /-->/, "a subtitle body contains a timing cue");
     }
