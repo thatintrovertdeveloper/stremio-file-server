@@ -1,0 +1,55 @@
+name: Security
+
+# Layered scans per the security-testing skill (A03 supply chain + SAST +
+# secrets). Runs on PRs alongside qa.yml; publish stays gated by qa.yml.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  sca-sast-secrets:
+    name: osv-scanner / semgrep / trufflehog / npm-audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Hard gate: no *critical* vulns in the addon tree.
+      # (Highs in router/tmp need a breaking SDK downgrade — tracked, report-only below.)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: addon/package-lock.json
+      - name: npm audit (critical gate)
+        working-directory: addon
+        run: npm audit --audit-level=critical
+
+      # Report-only until stremio-addon-sdk resolves router/tmp upstream:
+      # exits non-zero today on the 4 known highs, so it must not block the PR.
+      - name: OSV-Scanner (report-only)
+        uses: google/osv-scanner-action@v2
+        continue-on-error: true
+        with:
+          scan-args: |-
+            -r
+            ./addon
+            ./file-server
+
+      - name: Semgrep p/owasp-top-ten (report-only)
+        uses: returntocorp/semgrep-action@v1
+        continue-on-error: true
+        with:
+          config: p/owasp-top-ten
+
+      - name: TruffleHog secrets (verified only)
+        uses: trufflesecurity/trufflehog-actions-scan@v2
+        continue-on-error: true
+        with:
+          extra_args: --only-verified

@@ -9,6 +9,16 @@ const config = {
 };
 
 const cache = new Map();
+const CACHE_MAX = 500;
+const FETCH_TIMEOUT_MS = parseInt(process.env.TMDB_TIMEOUT_MS || "8000", 10);
+
+function cacheSetBounded(key, data) {
+  if (cache.size >= CACHE_MAX && !cache.has(key)) {
+    const oldest = cache.keys().next().value;
+    cache.delete(oldest);
+  }
+  cache.set(key, { data, timestamp: Date.now() });
+}
 const requestQueue = [];
 let requestCount = 0;
 let windowStart = Date.now();
@@ -69,6 +79,7 @@ async function tmdbFetch(endpoint, params = {}) {
         Authorization: `Bearer ${config.token}`,
         "Content-Type": "application/json",
       },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
 
     if (!response.ok) {
@@ -77,7 +88,7 @@ async function tmdbFetch(endpoint, params = {}) {
     }
 
     const data = await response.json();
-    setCache(cacheKey, data);
+    cacheSetBounded(cacheKey, data);
     return data;
   } catch (err) {
     console.error("TMDB fetch error:", err.message);

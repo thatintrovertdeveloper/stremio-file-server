@@ -5,7 +5,19 @@ const FILE_SERVER_URL = process.env.FILE_SERVER_URL || "http://localhost:3003";
 const FILE_SERVER_PUBLIC_URL = process.env.FILE_SERVER_PUBLIC_URL || FILE_SERVER_URL;
 const FILE_SERVER_API_KEY = process.env.FILE_SERVER_API_KEY || "";
 
+// Upstream timeout + bounded cache: fail closed instead of hanging handlers
+// (A06/A10), and cap memory when distinct titles are requested (A06 DoS).
+const FETCH_TIMEOUT_MS = parseInt(process.env.FILE_SERVER_TIMEOUT_MS || "8000", 10);
+const TMDB_SEARCH_CACHE_MAX = 500;
 const tmdbSearchCache = new Map();
+
+function cacheSetBounded(map, key, value, max) {
+  if (map.size >= max && !map.has(key)) {
+    const oldest = map.keys().next().value;
+    map.delete(oldest);
+  }
+  map.set(key, value);
+}
 
 function buildHeaders() {
   const headers = {};
@@ -26,6 +38,7 @@ function buildThumbUrl(filename) {
 async function fetchFileList() {
   const res = await fetch(`${FILE_SERVER_URL}/api/list`, {
     headers: buildHeaders(),
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!res.ok) {
     throw new Error(`File server returned ${res.status}`);
@@ -48,7 +61,7 @@ async function searchTMDB(title, year, type) {
   }
 
   if (results.length === 0) {
-    tmdbSearchCache.set(cacheKey, null);
+    cacheSetBounded(tmdbSearchCache, cacheKey, null, TMDB_SEARCH_CACHE_MAX);
     return null;
   }
 
@@ -63,7 +76,7 @@ async function searchTMDB(title, year, type) {
     }
   }
 
-  tmdbSearchCache.set(cacheKey, bestMatch);
+  cacheSetBounded(tmdbSearchCache, cacheKey, bestMatch, TMDB_SEARCH_CACHE_MAX);
   return bestMatch;
 }
 

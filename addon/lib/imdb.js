@@ -18,6 +18,8 @@ const tmdb = require("./tmdb");
 
 const CINEMETA_BASE = "https://v3-cinemeta.strem.io/meta";
 const CINEMETA_TTL = 60 * 60 * 1000;
+const CINEMETA_CACHE_MAX = 500;
+const FETCH_TIMEOUT_MS = parseInt(process.env.CINEMETA_TIMEOUT_MS || "8000", 10);
 const cinemetaCache = new Map();
 
 const IMDB_ID_PATTERN = /^(tt\d+)(?::(\d+):(\d+))?$/;
@@ -27,7 +29,7 @@ function normalizeTitle(s) {
 }
 
 function asyncFetchJson(url) {
-  return fetch(url).then((res) => (res.ok ? res.json() : null));
+  return fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }).then((res) => (res.ok ? res.json() : null));
 }
 
 async function fetchCinemetaMeta(type, imdbId) {
@@ -37,7 +39,13 @@ async function fetchCinemetaMeta(type, imdbId) {
   const meta = await asyncFetchJson(`${CINEMETA_BASE}/${type}/${imdbId}.json`)
     .then((data) => data && data.meta)
     .catch(() => null);
-  if (meta) cinemetaCache.set(key, { t: Date.now(), meta });
+  if (meta) {
+    if (cinemetaCache.size >= CINEMETA_CACHE_MAX && !cinemetaCache.has(key)) {
+      const oldest = cinemetaCache.keys().next().value;
+      cinemetaCache.delete(oldest);
+    }
+    cinemetaCache.set(key, { t: Date.now(), meta });
+  }
   return meta;
 }
 

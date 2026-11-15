@@ -11,6 +11,6 @@ WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
 COPY . .
 
-EXPOSE 7000
+EXPOSE 7001
 
 CMD ["node", "index.js"]
