@@ -34,7 +34,7 @@ jobs:
       # Report-only until stremio-addon-sdk resolves router/tmp upstream:
       # exits non-zero today on the 4 known highs, so it must not block the PR.
       - name: OSV-Scanner (report-only)
-        uses: google/osv-scanner-action@v2
+        uses: google/osv-scanner-action/osv-scanner-action@v2.7.1
         continue-on-error: true
         with:
           scan-args: |-
