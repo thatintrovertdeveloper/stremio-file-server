@@ -49,7 +49,7 @@ jobs:
           config: p/owasp-top-ten
 
       - name: TruffleHog secrets (verified only)
-        uses: trufflesecurity/trufflehog-actions-scan@v2
+        uses: trufflesecurity/trufflehog@v3.99.9
         continue-on-error: true
         with:
           extra_args: --only-verified
