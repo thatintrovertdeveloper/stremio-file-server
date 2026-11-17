@@ -26,10 +26,9 @@ module.exports = async function (args) {
             id: `__series__${title}`,
             type: "series",
             name: title,
-            poster: buildThumbUrl(firstEpisode.flatPath),
-            // A file-server thumbnail is an ffmpeg frame scaled to 16:9, not a
-            // 1:0.675 poster. Stremio crops/stretches it unless we say so.
-            posterShape: "landscape",
+            poster: buildThumbUrl(firstEpisode.flatPath, "poster"),
+            // Portrait cards, same shape as TMDB/Cinemeta posters.
+            posterShape: "poster",
             background: buildThumbUrl(firstEpisode.flatPath),
             description: `${files.filter((f) => f.type === "series" && f.title === title).length} episodes`,
           };
@@ -38,7 +37,6 @@ module.exports = async function (args) {
             const tmdbPoster = tmdb.getImageUrl(tmdbData.poster_path);
             if (tmdbPoster) {
               meta.poster = tmdbPoster;
-              meta.posterShape = "poster";
             }
             meta.background = tmdb.getImageUrl(tmdbData.backdrop_path, "original") || meta.background;
             meta.description = tmdbData.overview || meta.description;
@@ -64,8 +62,8 @@ module.exports = async function (args) {
           id: file.flatPath,
           type: "movie",
           name: file.name,
-          poster: buildThumbUrl(file.flatPath),
-          posterShape: "landscape",
+          poster: buildThumbUrl(file.flatPath, "poster"),
+          posterShape: "poster",
           background: buildThumbUrl(file.flatPath),
           description: [
             file.folderName,
@@ -80,7 +78,6 @@ module.exports = async function (args) {
           const tmdbPoster = tmdb.getImageUrl(tmdbData.poster_path);
           if (tmdbPoster) {
             meta.poster = tmdbPoster;
-            meta.posterShape = "poster";
           }
           meta.background = tmdb.getImageUrl(tmdbData.backdrop_path, "original") || meta.background;
           meta.description = tmdbData.overview || meta.description;

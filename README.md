@@ -51,7 +51,7 @@ FILE_SERVER_URL=http://localhost:3003 FILE_SERVER_API_KEY=mysecret PORT=7001 nod
 |---|---|
 | `GET /health` | Health check |
 | `GET /api/list` | List video files |
-| `GET /api/thumbnail/{filename}` | Video thumbnail |
+| `GET /api/thumbnail/{filename}` | Video thumbnail (`?shape=poster` for a 2:3 card, default `landscape` 16:9) |
 | `GET /{path}` | Stream video (range requests) |
 
 ### Authentication

@@ -28,8 +28,8 @@ module.exports = async function (args) {
         id: args.id,
         type: "series",
         name: showTitle,
-        poster: buildThumbUrl(firstEp.flatPath),
-        posterShape: "landscape",
+        poster: buildThumbUrl(firstEp.flatPath, "poster"),
+        posterShape: "poster",
         background: buildThumbUrl(firstEp.flatPath),
         description: `${episodes.length} episodes`,
         videos: episodes
@@ -49,7 +49,6 @@ module.exports = async function (args) {
         const tmdbPoster = tmdb.getImageUrl(tmdbShow.poster_path);
         if (tmdbPoster) {
           meta.poster = tmdbPoster;
-          meta.posterShape = "poster";
         }
         meta.background = tmdb.getImageUrl(tmdbShow.backdrop_path, "original") || meta.background;
         meta.description = tmdbShow.overview || meta.description;
@@ -92,8 +91,8 @@ module.exports = async function (args) {
       id: match.flatPath,
       type: "movie",
       name: match.name,
-      poster: buildThumbUrl(match.flatPath),
-      posterShape: "landscape",
+      poster: buildThumbUrl(match.flatPath, "poster"),
+      posterShape: "poster",
       background: buildThumbUrl(match.flatPath),
       description: [
         match.folderName,
@@ -108,7 +107,6 @@ module.exports = async function (args) {
       const tmdbPoster = tmdb.getImageUrl(tmdbMovie.poster_path);
       if (tmdbPoster) {
         meta.poster = tmdbPoster;
-        meta.posterShape = "poster";
       }
       meta.background = tmdb.getImageUrl(tmdbMovie.backdrop_path, "original") || meta.background;
       meta.description = tmdbMovie.overview || meta.description;

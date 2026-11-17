@@ -27,12 +27,17 @@ function buildHeaders() {
   return headers;
 }
 
-function buildThumbUrl(filename) {
+function buildThumbUrl(filename, shape = "landscape") {
   const base = `${FILE_SERVER_PUBLIC_URL}/api/thumbnail/${encodeURIComponent(filename)}`;
-  if (FILE_SERVER_API_KEY) {
-    return `${base}?key=${encodeURIComponent(FILE_SERVER_API_KEY)}`;
+  const params = new URLSearchParams();
+  if (shape !== "landscape") {
+    params.set("shape", shape);
   }
-  return base;
+  if (FILE_SERVER_API_KEY) {
+    params.set("key", FILE_SERVER_API_KEY);
+  }
+  const qs = params.toString();
+  return qs ? `${base}?${qs}` : base;
 }
 
 async function fetchFileList() {

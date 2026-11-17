@@ -46,7 +46,7 @@ Addon install URL (both shapes): `http://<host>:7001/manifest.json`.
 bash scripts/qa-setup.sh
 
 # Full suite: starts both services on 3003/7001 against the fixture library,
-# runs 28 checks, tears down (process groups), exit 0 = green. Ports are
+# runs 29 checks, tears down (process groups), exit 0 = green. Ports are
 # overridable (FS_PORT/ADDON_PORT) so a live deployment can stay up.
 bash scripts/qa-e2e.sh
 
@@ -93,7 +93,7 @@ called by `docker-publish.yml`). No linter config, no typecheck, no unit tests y
 - **Series IDs use `__series__` prefix** — `__series__{title}`. Stream/meta match episodes by `flatPath`, not show ID.
 - **Subtitle matching by stem prefix** — `Movie.mp4` matches `Movie.eng.srt`, `Movie.spa.srt`, `Movie.forced.eng.srt`. Subtitle stem must start with video stem (case-insensitive).
 - **Subtitle objects use `label`, not `name`** — `id`/`url`/`lang` are required, and the picker text is `label`. A `name` field is silently dropped, which makes `X.eng.srt` and `X.forced.eng.srt` indistinguishable (both become `lang: "eng"`). `behaviorHints.videoSize` is set alongside `filename` so external subtitle addons can match the exact file.
-- **`posterShape` must travel with `poster`** — a file-server thumbnail is an ffmpeg frame at `scale=W:-1`, i.e. 16:9, so it needs `posterShape: "landscape"`. Default is `poster` (1:0.675), which crops every thumbnail. A TMDB poster override must flip it back to `"poster"`.
+- **`posterShape` must travel with `poster`** — `/api/thumbnail/{name}` serves `?shape=landscape` (16:9 frame, `scale=320:-1`) by default and `?shape=poster` (300×450, 2:3, frame scaled to fit over a blurred copy of itself). The addon requests `shape=poster` for `poster` + `posterShape: "poster"` so file-server cards match TMDB/Cinemeta posters, and keeps the landscape URL for `background`. Cache key is `md5("{shape}:{filename}")`, so poster and landscape renders never collide.
 - **Video objects use `overview`, not `description`** — `id` + `title` are required; a TMDB episode summary sent to `description` is silently dropped.
 - **File dedup by full path** — Dedup key is `{root}:{relpath}`, not basename. Prevents collisions across multi-dir setups.
 - **API key auth** — Three methods: `X-API-Key` header, `Authorization: Bearer`, `?key=` query param. All checked in order.
@@ -158,7 +158,7 @@ addon/
   Dockerfile         # multi-stage node:20-alpine
 
 tests/e2e/
-  critical-flows.test.mjs   # 28 protocol/integration/E2E checks (node --test)
+  critical-flows.test.mjs   # 29 protocol/integration/E2E checks (node --test)
 
 scripts/
   qa-setup.sh        # venv + pinned deps + npm ci + fixtures

@@ -220,6 +220,22 @@ describe("file-server: streaming contract", () => {
     assert.deepEqual(Array.from(bytes.subarray(0, 8)), [137, 80, 78, 71, 13, 10, 26, 10], "PNG magic");
   });
 
+  test("poster thumbnails are 2:3 and landscape ones stay 16:9", async () => {
+    // PNG IHDR: width at 16..19, height at 20..23 (big-endian).
+    const dims = async (url) => {
+      const res = await fetch(url, { headers: AUTH });
+      assert.equal(res.status, 200);
+      const b = Buffer.from(await res.arrayBuffer());
+      return [b.readUInt32BE(16), b.readUInt32BE(20)];
+    };
+    const name = encodeURIComponent(MOVIE);
+    assert.deepEqual(await dims(`${FILES}/api/thumbnail/${name}?shape=poster`), [300, 450]);
+    const [lw, lh] = await dims(`${FILES}/api/thumbnail/${name}?shape=landscape`);
+    assert.equal(lw, 320); // landscape keeps the source aspect (fixture is 4:3, not 16:9)
+    assert.notEqual(lh, 450);
+    assert.equal((await fetch(`${FILES}/api/thumbnail/${name}?shape=bogus`, { headers: AUTH })).status, 400);
+  });
+
   test("404s an unknown file and blocks path traversal", async () => {
     assert.equal((await fetch(`${FILES}/Nope.Movie.2020.mp4`, { headers: AUTH })).status, 404);
     for (const attack of ["/../etc/passwd", "/%2e%2e/%2e%2e/etc/passwd", "/..%2f..%2fetc%2fpasswd"]) {
@@ -258,10 +274,10 @@ describe("addon: Stremio protocol", () => {
     const movie = body.metas.find((m) => m.id === MOVIE);
     assert.ok(movie, "the fixture movie must appear in the catalog");
     assert.equal(movie.type, "movie");
-    assert.equal(movie.poster, `${PUBLIC_URL}/api/thumbnail/${encodeURIComponent(MOVIE)}?key=${KEY}`);
-    // The thumbnail is an ffmpeg frame scaled to 16:9; the default posterShape
-    // (1:0.675) makes Stremio crop it.
-    assert.equal(movie.posterShape, "landscape");
+    assert.equal(movie.poster, `${PUBLIC_URL}/api/thumbnail/${encodeURIComponent(MOVIE)}?shape=poster&key=${KEY}`);
+    // Poster-shaped thumbnails so local cards match poster-based addons.
+    assert.equal(movie.posterShape, "poster");
+    assert.equal(movie.background, `${PUBLIC_URL}/api/thumbnail/${encodeURIComponent(MOVIE)}?key=${KEY}`);
     assert.match(movie.description, /Complete/);
   });
 
@@ -271,7 +287,7 @@ describe("addon: Stremio protocol", () => {
     assert.equal(ids.filter((id) => id === `__series__${SHOW}`).length, 1, "one entry per show");
     const show = body.metas.find((m) => m.id === `__series__${SHOW}`);
     assert.equal(show.type, "series");
-    assert.equal(show.posterShape, "landscape");
+    assert.equal(show.posterShape, "poster");
     assert.match(show.description, /^2 episodes$/);
     assert.ok(!ids.some((id) => id.includes(MOVIE)), "movies must not leak into the series catalog");
   });

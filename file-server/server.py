@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, Header, HTTPException, Request, Response, Security, Depends
+from fastapi import FastAPI, Header, HTTPException, Query, Request, Response, Security, Depends
 from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
@@ -158,6 +158,9 @@ def detect_subtitle_lang(filename: str) -> str:
 
 THUMBNAIL_CACHE_DIR = os.path.join(tempfile.gettempdir(), "file-server-thumbnails")
 THUMBNAIL_WIDTH = 320
+POSTER_WIDTH = 300
+POSTER_HEIGHT = 450  # 2:3, matches Stremio's default posterShape
+THUMBNAIL_SHAPES = ("landscape", "poster")
 THUMBNAIL_CACHE_MAX_SIZE = 100 * 1024 * 1024  # 100MB max cache size
 
 SE_PATTERNS = [
@@ -410,11 +413,24 @@ def find_file_by_name(filename: str) -> Optional[str]:
     return None
 
 
-def extract_thumbnail(file_path: str, dest: str) -> bool:
+def extract_thumbnail(file_path: str, dest: str, shape: str = "landscape") -> bool:
+    if shape == "poster":
+        # Portrait 2:3 card so file-server entries line up with poster-based
+        # addons. The whole frame stays visible: the frame is scaled down to
+        # fit and the leftover bars are a blurred copy of itself, not black.
+        vf = (
+            "split[a][b];"
+            f"[a]scale={POSTER_WIDTH}:{POSTER_HEIGHT}:force_original_aspect_ratio=increase,"
+            f"crop={POSTER_WIDTH}:{POSTER_HEIGHT},boxblur=20:2[bg];"
+            f"[b]scale={POSTER_WIDTH}:{POSTER_HEIGHT}:force_original_aspect_ratio=decrease[fg];"
+            "[bg][fg]overlay=(W-w)/2:(H-h)/2"
+        )
+    else:
+        vf = f"scale={THUMBNAIL_WIDTH}:-1"
     cmd = [
         "ffmpeg", "-y", "-i", file_path,
         "-vframes", "1",
-        "-vf", f"scale={THUMBNAIL_WIDTH}:-1",
+        "-vf", vf,
         "-f", "image2",
         dest,
     ]
@@ -458,9 +474,9 @@ def evict_thumbnail_cache():
         pass
 
 
-def get_thumbnail_path(filename: str) -> Optional[str]:
+def get_thumbnail_path(filename: str, shape: str = "landscape") -> Optional[str]:
     os.makedirs(THUMBNAIL_CACHE_DIR, exist_ok=True)
-    h = hashlib.md5(filename.encode()).hexdigest()[:12]
+    h = hashlib.md5(f"{shape}:{filename}".encode()).hexdigest()[:12]
     thumb = os.path.join(THUMBNAIL_CACHE_DIR, f"{h}.png")
 
     if os.path.exists(thumb) and os.path.getsize(thumb) > 0:
@@ -472,7 +488,7 @@ def get_thumbnail_path(filename: str) -> Optional[str]:
     if not source:
         return None
 
-    if extract_thumbnail(source, thumb):
+    if extract_thumbnail(source, thumb, shape):
         return thumb
     return None
 
@@ -521,8 +537,14 @@ async def list_files(auth: bool = Depends(verify_api_key)):
 
 
 @app.get("/api/thumbnail/{filename}")
-async def thumbnail(filename: str, auth: bool = Depends(verify_api_key)):
-    path = get_thumbnail_path(filename)
+async def thumbnail(
+    filename: str,
+    shape: str = Query("landscape"),
+    auth: bool = Depends(verify_api_key),
+):
+    if shape not in THUMBNAIL_SHAPES:
+        raise HTTPException(status_code=400, detail=f"shape must be one of {list(THUMBNAIL_SHAPES)}")
+    path = get_thumbnail_path(filename, shape)
     if not path:
         raise HTTPException(status_code=404, detail="Thumbnail not found")
     return FileResponse(path, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
